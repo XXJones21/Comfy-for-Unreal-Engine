@@ -1,0 +1,203 @@
+{
+  "comfy_unreal": {
+    "display_name": "Sound Effect (Stable Audio Open)",
+    "category": "Audio",
+    "description": "A sound effect, ambience or short music loop from a text prompt, up to 47 seconds, saved as FLAC and imported as a Sound Wave. Stock ComfyUI nodes. Needs stable-audio-open-1.0.safetensors in models/checkpoints and t5-base.safetensors in models/text_encoders.",
+    "inputs": [
+      {
+        "name": "prompt",
+        "label": "Sound",
+        "node_id": "6",
+        "input": "text",
+        "type": "Text",
+        "tooltip": "For example: heavy wooden door creaking open in a stone hall, reverb"
+      },
+      {
+        "name": "negative_prompt",
+        "label": "Avoid",
+        "node_id": "7",
+        "input": "text",
+        "type": "Text"
+      },
+      {
+        "name": "seconds",
+        "label": "Seconds",
+        "node_id": "20",
+        "input": "value",
+        "type": "Float",
+        "tooltip": "Length, 1 to 47"
+      },
+      {
+        "name": "seed",
+        "label": "Seed",
+        "node_id": "3",
+        "input": "seed",
+        "type": "Seed"
+      },
+      {
+        "name": "steps",
+        "label": "Steps",
+        "node_id": "3",
+        "input": "steps",
+        "type": "Int"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "sound",
+        "node_id": "19",
+        "kind": "Audio",
+        "import": "Sound"
+      }
+    ]
+  },
+  "prompt": {
+    "4": {
+      "class_type": "CheckpointLoaderSimple",
+      "_meta": {
+        "title": "Load Checkpoint"
+      },
+      "inputs": {
+        "ckpt_name": "stable-audio-open-1.0.safetensors"
+      }
+    },
+    "10": {
+      "class_type": "CLIPLoader",
+      "_meta": {
+        "title": "Text encoder"
+      },
+      "inputs": {
+        "clip_name": "t5-base.safetensors",
+        "type": "stable_audio"
+      }
+    },
+    "6": {
+      "class_type": "CLIPTextEncode",
+      "_meta": {
+        "title": "Positive"
+      },
+      "inputs": {
+        "text": "heavy wooden door creaking open in a stone hall, reverb",
+        "clip": [
+          "10",
+          0
+        ]
+      }
+    },
+    "7": {
+      "class_type": "CLIPTextEncode",
+      "_meta": {
+        "title": "Negative"
+      },
+      "inputs": {
+        "text": "low quality, noise, music",
+        "clip": [
+          "10",
+          0
+        ]
+      }
+    },
+    "11": {
+      "class_type": "EmptyLatentAudio",
+      "_meta": {
+        "title": "Length"
+      },
+      "inputs": {
+        "seconds": [
+          "20",
+          0
+        ],
+        "batch_size": 1
+      }
+    },
+    "12": {
+      "class_type": "ConditioningStableAudio",
+      "_meta": {
+        "title": "Timing"
+      },
+      "inputs": {
+        "positive": [
+          "6",
+          0
+        ],
+        "negative": [
+          "7",
+          0
+        ],
+        "seconds_start": 0.0,
+        "seconds_total": [
+          "20",
+          0
+        ]
+      }
+    },
+    "3": {
+      "class_type": "KSampler",
+      "_meta": {
+        "title": "KSampler"
+      },
+      "inputs": {
+        "seed": 0,
+        "steps": 50,
+        "cfg": 4.98,
+        "sampler_name": "dpmpp_3m_sde_gpu",
+        "scheduler": "exponential",
+        "denoise": 1.0,
+        "model": [
+          "4",
+          0
+        ],
+        "positive": [
+          "12",
+          0
+        ],
+        "negative": [
+          "12",
+          1
+        ],
+        "latent_image": [
+          "11",
+          0
+        ]
+      }
+    },
+    "18": {
+      "class_type": "VAEDecodeAudio",
+      "_meta": {
+        "title": "Decode audio"
+      },
+      "inputs": {
+        "samples": [
+          "3",
+          0
+        ],
+        "vae": [
+          "4",
+          2
+        ]
+      }
+    },
+    "19": {
+      "class_type": "SaveAudio",
+      "_meta": {
+        "title": "Sound"
+      },
+      "inputs": {
+        "filename_prefix": "unreal/audio",
+        "audio": [
+          "18",
+          0
+        ]
+      }
+    },
+    "20": {
+      "class_type": "PrimitiveFloat",
+      "_meta": {
+        "title": "Seconds"
+      },
+      "inputs": {
+        "value": 6.0
+      }
+    }
+  }
+}
