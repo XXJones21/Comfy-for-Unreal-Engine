@@ -131,7 +131,7 @@ Registered as `ComfyAgent.ComfyToolset` in Epic's ToolsetRegistry, so Unreal MCP
 | `list_backends` | | Backends, active one, last health check. |
 | `check_backend(Backend)` | yes | Probe one backend. |
 | `set_active_backend(Backend)` | | |
-| `list_workflows(Category)` | | Project and built-in workflows with input names. |
+| `list_workflows(CategoryFilter)` | | Project and built-in workflows with input names. |
 | `describe_workflow(Workflow)` | | JSON Schema of inputs, outputs, missing nodes, credit use. |
 | `run_workflow(Workflow, Inputs, Backend, bAllowCreditSpend)` | | Starts a job; seeds default to random. |
 | `wait_for_job(JobId, TimeoutSeconds)` | yes | Up to 600 s; the job keeps running after a timeout. |

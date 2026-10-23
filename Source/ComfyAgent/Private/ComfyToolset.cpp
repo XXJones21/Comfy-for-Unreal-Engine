@@ -280,12 +280,12 @@ FString UComfyToolset::SetActiveBackend(const FString& Backend)
 	return ListBackends();
 }
 
-FString UComfyToolset::ListWorkflows(const FString& Category)
+FString UComfyToolset::ListWorkflows(const FString& CategoryFilter)
 {
 	TArray<TSharedPtr<FJsonValue>> Items;
 	for (const UComfyWorkflow* Workflow : UComfyEditorLibrary::GetAllWorkflows())
 	{
-		if (Category.IsEmpty() || Workflow->Category.Equals(Category, ESearchCase::IgnoreCase))
+		if (CategoryFilter.IsEmpty() || Workflow->Category.Equals(CategoryFilter, ESearchCase::IgnoreCase))
 		{
 			Items.Add(MakeShared<FJsonValueObject>(WorkflowJson(Workflow, false)));
 		}

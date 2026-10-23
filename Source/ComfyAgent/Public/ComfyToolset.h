@@ -45,11 +45,11 @@ public:
 
 	/**
 	 * List the workflows available to run: workflow assets in the project and the plugin's built-in ones.
-	 * @param Category Only list this category (for example Textures, Audio, Meshes). Empty lists all.
+	 * @param CategoryFilter Only list this category (for example Textures, Audio, Meshes). Empty lists all.
 	 * @return JSON array: [{name, path, display_name, category, description, uses_credits, inputs, outputs}]
 	 */
 	UFUNCTION(meta = (AICallable), Category = "Comfy")
-	static FString ListWorkflows(const FString& Category);
+	static FString ListWorkflows(const FString& CategoryFilter);
 
 	/**
 	 * Describe one workflow: its inputs as JSON Schema, its outputs, and anything the active backend is missing.

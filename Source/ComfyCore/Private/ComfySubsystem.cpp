@@ -894,7 +894,9 @@ TArray<UComfyWorkflow*> UComfySubsystem::GetBuiltInWorkflows(bool bReload)
 			{
 				continue;
 			}
-			const FName ObjectName = MakeUniqueObjectName(this, UComfyWorkflow::StaticClass(), FName(*FPaths::GetBaseFilename(File)));
+			// Keep the file's name so agents can find a built-in by it; only a reload needs a unique one.
+			const FName BaseName(*FPaths::GetBaseFilename(File));
+			const FName ObjectName = StaticFindObjectFast(nullptr, this, BaseName) ? MakeUniqueObjectName(this, UComfyWorkflow::StaticClass(), BaseName) : BaseName;
 			UComfyWorkflow* Workflow = NewObject<UComfyWorkflow>(this, ObjectName, RF_Transient);
 			if (!Workflow->SetGraphFromJson(Json, true, Error))
 			{
