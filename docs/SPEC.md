@@ -124,26 +124,26 @@ Functions: `Cancel`, `IsFinished`, `Succeeded`, `GetOutput(Name)`, `GetOutputsOf
 
 ## 4. Agent toolset (Unreal MCP)
 
-Registered as `ComfyAgent.ComfyToolset` in Epic's ToolsetRegistry, so Unreal MCP's `list_toolsets`, `describe_toolset` and `call_tool` expose it with no extra server. Every tool returns JSON. Long-running tools return an async result and finish when the work does.
+Registered as `ComfyAgent.ComfyToolset` in Epic's ToolsetRegistry, so Unreal MCP's `list_toolsets`, `describe_toolset` and `call_tool` expose it with no extra server. Tool names are the C++ function names and parameters are camelCase, as the registry exposes them; every parameter is required (pass `""` for an empty string). Every tool returns `{"returnValue": "<JSON>"}`. Long-running tools return an async result and finish when the work does.
 
 | Tool | Async | What it does |
 | --- | --- | --- |
-| `list_backends` | | Backends, active one, last health check. |
-| `check_backend(Backend)` | yes | Probe one backend. |
-| `set_active_backend(Backend)` | | |
-| `list_workflows(CategoryFilter)` | | Project and built-in workflows with input names. |
-| `describe_workflow(Workflow)` | | JSON Schema of inputs, outputs, missing nodes, credit use. |
-| `run_workflow(Workflow, Inputs, Backend, bAllowCreditSpend)` | | Starts a job; seeds default to random. |
-| `wait_for_job(JobId, TimeoutSeconds)` | yes | Up to 600 s; the job keeps running after a timeout. |
-| `get_job`, `list_jobs`, `cancel_job` | | |
-| `import_job_outputs(JobId, DestinationPath)` | | Asset paths and classes. |
-| `create_material_from_job(JobId, DestinationPath, MaterialName, bAssignToSelection)` | | Tileable texture, normal map, material instance. |
-| `generate_material(Prompt, Workflow, bAssignToSelection, bAllowCreditSpend)` | yes | Prompt to assigned material in one call. |
-| `import_workflow(FilePath, DestinationPath)` | | |
-| `list_router_models(Cursor)`, `describe_router_model(ModelId)` | yes | |
-| `run_router_model(ModelId, RequestJson, bAllowCreditSpend)` | | |
+| `ListBackends()` | | Backends, active one, last health check. |
+| `CheckBackend(backend)` | yes | Probe one backend. |
+| `SetActiveBackend(backend)` | | |
+| `ListWorkflows(categoryFilter)` | | Project and built-in workflows with input names. `""` lists all. |
+| `DescribeWorkflow(workflow)` | | JSON Schema of inputs, outputs, missing nodes, credit use. |
+| `RunWorkflow(workflow, inputs, backend, bAllowCreditSpend)` | | Starts a job; seeds default to random. |
+| `WaitForJob(jobId, timeoutSeconds)` | yes | Up to 600 s; the job keeps running after a timeout. |
+| `GetJob(jobId)`, `ListJobs()`, `CancelJob(jobId)` | | |
+| `ImportJobOutputs(jobId, destinationPath)` | | Asset paths and classes. |
+| `CreateMaterialFromJob(jobId, destinationPath, materialName, bAssignToSelection)` | | Tileable texture, normal map, material instance. |
+| `GenerateMaterial(prompt, workflow, bAssignToSelection, bAllowCreditSpend)` | yes | Prompt to assigned material in one call. |
+| `ImportWorkflow(filePath, destinationPath)` | | |
+| `ListRouterModels(cursor)`, `DescribeRouterModel(modelId)` | yes | |
+| `RunRouterModel(modelId, requestJson, bAllowCreditSpend)` | | |
 
-Credit guard: when "agents must confirm credit spend" is on (default), any run that spends credits fails with a message telling the agent to ask the user and retry with `bAllowCreditSpend = true`.
+Credit guard: when "agents must confirm credit spend" is on (default), any run that spends credits fails with a message telling the agent to ask the user and retry with `bAllowCreditSpend` set to true.
 
 ## 5. Bundled workflow format
 

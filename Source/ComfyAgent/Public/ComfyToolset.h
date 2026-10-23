@@ -11,9 +11,9 @@
  * Generate game assets with ComfyUI from inside the Unreal Editor: textures and PBR materials,
  * sound effects and music, 3D meshes, or any custom ComfyUI workflow imported into the project.
  * Runs on Comfy Desktop (local GPU), Comfy Cloud, Comfy API deployments, or Comfy Router models.
- * Typical flow: list_workflows, describe_workflow, run_workflow, wait_for_job, then
- * import_job_outputs or create_material_from_job. generate_material does all of that in one call.
- * Every result is JSON. Jobs keep running in the background; poll get_job or call wait_for_job.
+ * Typical flow: ListWorkflows, DescribeWorkflow, RunWorkflow, WaitForJob, then
+ * ImportJobOutputs or CreateMaterialFromJob. GenerateMaterial does all of that in one call.
+ * Every result is JSON. Jobs keep running in the background; poll GetJob or call WaitForJob.
  */
 UCLASS(BlueprintType, MinimalAPI)
 class UComfyToolset : public UToolsetDefinition
@@ -30,7 +30,7 @@ public:
 
 	/**
 	 * Check that a backend answers and accepts the API key. Waits for the answer.
-	 * @param Backend Backend name from list_backends. Empty checks the active backend.
+	 * @param Backend Backend name from ListBackends. Empty checks the active backend.
 	 * @return JSON: {name, reachable, summary}
 	 */
 	UFUNCTION(meta = (AICallable), Category = "Comfy")
@@ -38,7 +38,7 @@ public:
 
 	/**
 	 * Make a backend the active one for later runs. Saved to the user's editor settings.
-	 * @param Backend Backend name from list_backends.
+	 * @param Backend Backend name from ListBackends.
 	 */
 	UFUNCTION(meta = (AICallable), Category = "Comfy")
 	static FString SetActiveBackend(const FString& Backend);
@@ -53,15 +53,15 @@ public:
 
 	/**
 	 * Describe one workflow: its inputs as JSON Schema, its outputs, and anything the active backend is missing.
-	 * @param Workflow Workflow name, display name or asset path from list_workflows.
+	 * @param Workflow Workflow name, display name or asset path from ListWorkflows.
 	 * @return JSON: {name, description, input_schema, outputs, missing_nodes, uses_credits}
 	 */
 	UFUNCTION(meta = (AICallable), Category = "Comfy")
 	static FString DescribeWorkflow(const FString& Workflow);
 
 	/**
-	 * Start a workflow and return at once with the job. Use wait_for_job to wait for it.
-	 * @param Workflow Workflow name, display name or asset path from list_workflows.
+	 * Start a workflow and return at once with the job. Use WaitForJob to wait for it.
+	 * @param Workflow Workflow name, display name or asset path from ListWorkflows.
 	 * @param Inputs Input values by name, as strings, for example {"prompt": "mossy cobblestone", "seed": "random"}. Inputs left out keep their defaults.
 	 * @param Backend Backend name. Empty uses the active backend.
 	 * @param bAllowCreditSpend Set true only after the user agreed to spend Comfy credits on this run.
@@ -72,7 +72,7 @@ public:
 
 	/**
 	 * Wait until a job finishes, or until the timeout passes, and return its state.
-	 * @param JobId Job id from run_workflow or run_router_model.
+	 * @param JobId Job id from RunWorkflow or RunRouterModel.
 	 * @param TimeoutSeconds How long to wait, 1 to 600. The job keeps running after a timeout.
 	 * @return JSON of the job.
 	 */
@@ -140,7 +140,7 @@ public:
 	 * Import a ComfyUI workflow exported with Export (API) as a workflow asset, so it can be run.
 	 * @param FilePath Absolute path of the .json file on this machine.
 	 * @param DestinationPath Content folder. Empty uses /Game/Comfy/Workflows.
-	 * @return JSON of the workflow, as describe_workflow returns it.
+	 * @return JSON of the workflow, as DescribeWorkflow returns it.
 	 */
 	UFUNCTION(meta = (AICallable), Category = "Comfy")
 	static FString ImportWorkflow(const FString& FilePath, const FString& DestinationPath);
@@ -165,7 +165,7 @@ public:
 	 * Call a Comfy Router model with its native request body. Media in the result are downloaded
 	 * as the job's outputs. Always spends Comfy credits.
 	 * @param ModelId Model id such as bfl/flux-2-pro.
-	 * @param RequestJson Request body as JSON text, shaped by describe_router_model.
+	 * @param RequestJson Request body as JSON text, shaped by DescribeRouterModel.
 	 * @param bAllowCreditSpend Set true only after the user agreed to spend Comfy credits.
 	 * @return JSON of the job.
 	 */

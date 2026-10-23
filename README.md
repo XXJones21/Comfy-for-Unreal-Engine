@@ -10,7 +10,7 @@ Proof of concept for the 2026 Epic AI MegaJam. Targets Unreal Engine 5.8.
 - **Workflows are assets.** Import a ComfyUI `Export (API)` JSON and it becomes a Comfy Workflow asset with a manifest of inputs (prompt, seed, size, files...) and outputs (image, audio, mesh). The manifest drives the editor form, the Blueprint node, and the agent tool schema.
 - **Built-in game workflows** in `Resources/Workflows`: seamless textures (Flux Schnell, Flux Dev GGUF), sound effects (Stable Audio Open) and image-to-mesh (Hunyuan3D 2).
 - **Comfy Studio tab** (Tools menu or the Comfy toolbar button): pick a backend and workflow, fill the form, run, and watch jobs import themselves.
-- **Agent toolset** for Epic's Unreal MCP server: `ComfyAgent.ComfyToolset` with tools such as `list_workflows`, `run_workflow`, `wait_for_job`, `create_material_from_job` and `generate_material` (prompt to assigned material in one call).
+- **Agent toolset** for Epic's Unreal MCP server: `ComfyAgent.ComfyToolset` with tools such as `ListWorkflows`, `RunWorkflow`, `WaitForJob`, `CreateMaterialFromJob` and `GenerateMaterial` (prompt to assigned material in one call).
 - **Provenance.** Every imported asset carries the workflow, inputs, seed, backend and job that made it.
 
 ## Install
@@ -50,7 +50,7 @@ comfy = unreal.get_engine_subsystem(unreal.ComfySubsystem)
 job = comfy.run_workflow(workflow, {"prompt": "weathered red brick"}, "Desktop")
 ```
 
-**Agents (Unreal MCP):** `call_tool("ComfyAgent.ComfyToolset", "generate_material", {"Prompt": "weathered red brick", "bAssignToSelection": true})`.
+**Agents (Unreal MCP):** `call_tool` with `{"toolset_name": "ComfyAgent.ComfyToolset", "tool_name": "GenerateMaterial", "arguments": {"prompt": "weathered red brick", "workflow": "", "bAssignToSelection": true, "bAllowCreditSpend": false}}`.
 
 See [docs/SPEC.md](docs/SPEC.md) for the full UI and API outline.
 

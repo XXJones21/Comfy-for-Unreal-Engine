@@ -510,7 +510,6 @@ FString UComfyWorkflow::GetInputSchemaJson() const
 		switch (Input.Type)
 		{
 		case EComfyInputType::Int:
-		case EComfyInputType::Seed:
 			Prop->SetStringField(TEXT("type"), TEXT("integer"));
 			break;
 		case EComfyInputType::Float:
@@ -530,10 +529,11 @@ FString UComfyWorkflow::GetInputSchemaJson() const
 		}
 		if (Input.Type == EComfyInputType::Seed)
 		{
-			PropDescription += TEXT(". Use \"random\" for a new seed.");
+			PropDescription += TEXT(". A whole number, or \"random\" for a new seed on every run.");
 		}
 		Prop->SetStringField(TEXT("description"), PropDescription);
-		Prop->SetStringField(TEXT("default"), Input.DefaultValue);
+		// Seeds are sent as text so "random" fits the schema; agent runs get a random seed when they leave it out.
+		Prop->SetStringField(TEXT("default"), Input.Type == EComfyInputType::Seed ? FString(TEXT("random")) : Input.DefaultValue);
 		if (Input.Options.Num() > 0)
 		{
 			TArray<TSharedPtr<FJsonValue>> Enum;

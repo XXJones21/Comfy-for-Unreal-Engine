@@ -11,6 +11,7 @@
 #include "Dom/JsonValue.h"
 #include "Kismet/KismetSystemLibrary.h"
 #include "Materials/MaterialInstanceConstant.h"
+#include "Policies/CondensedJsonPrintPolicy.h"
 #include "Serialization/JsonReader.h"
 #include "Serialization/JsonSerializer.h"
 #include "Serialization/JsonWriter.h"
@@ -21,7 +22,7 @@ namespace ComfyToolsetPrivate
 	static FString Write(const TSharedRef<FJsonObject>& Object)
 	{
 		FString Out;
-		const TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&Out);
+		const TSharedRef<TJsonWriter<TCHAR, TCondensedJsonPrintPolicy<TCHAR>>> Writer = TJsonWriterFactory<TCHAR, TCondensedJsonPrintPolicy<TCHAR>>::Create(&Out);
 		FJsonSerializer::Serialize(Object, Writer);
 		return Out;
 	}
@@ -29,7 +30,7 @@ namespace ComfyToolsetPrivate
 	static FString Write(const TArray<TSharedPtr<FJsonValue>>& Array)
 	{
 		FString Out;
-		const TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&Out);
+		const TSharedRef<TJsonWriter<TCHAR, TCondensedJsonPrintPolicy<TCHAR>>> Writer = TJsonWriterFactory<TCHAR, TCondensedJsonPrintPolicy<TCHAR>>::Create(&Out);
 		FJsonSerializer::Serialize(Array, Writer);
 		return Out;
 	}
@@ -76,7 +77,7 @@ namespace ComfyToolsetPrivate
 		UComfyJob* Job = Comfy() ? Comfy()->FindJob(JobId) : nullptr;
 		if (!Job)
 		{
-			OutError = FString::Printf(TEXT("No job with id \"%s\" in this editor session. list_jobs shows the current ones."), *JobId);
+			OutError = FString::Printf(TEXT("No job with id \"%s\" in this editor session. ListJobs shows the current ones."), *JobId);
 		}
 		return Job;
 	}
@@ -244,7 +245,7 @@ UToolCallAsyncResultString* UComfyToolset::CheckBackend(const FString& Backend)
 	FComfyBackendProfile Profile;
 	if (!Subsystem->GetBackendProfile(Name, Profile))
 	{
-		return ErrorResult(FString::Printf(TEXT("No backend named \"%s\". list_backends shows the configured ones."), *Backend));
+		return ErrorResult(FString::Printf(TEXT("No backend named \"%s\". ListBackends shows the configured ones."), *Backend));
 	}
 
 	TStrongObjectPtr<UToolCallAsyncResultString> Result(NewResult());
@@ -298,7 +299,7 @@ FString UComfyToolset::DescribeWorkflow(const FString& Workflow)
 	const UComfyWorkflow* Found = UComfyEditorLibrary::FindWorkflow(Workflow);
 	if (!Found)
 	{
-		return ToolError(FString::Printf(TEXT("No workflow named \"%s\". list_workflows shows what's available."), *Workflow));
+		return ToolError(FString::Printf(TEXT("No workflow named \"%s\". ListWorkflows shows what's available."), *Workflow));
 	}
 	return Write(WorkflowJson(Found, true));
 }
@@ -308,7 +309,7 @@ FString UComfyToolset::RunWorkflow(const FString& Workflow, const TMap<FString, 
 	UComfyWorkflow* Found = UComfyEditorLibrary::FindWorkflow(Workflow);
 	if (!Found)
 	{
-		return ToolError(FString::Printf(TEXT("No workflow named \"%s\". list_workflows shows what's available."), *Workflow));
+		return ToolError(FString::Printf(TEXT("No workflow named \"%s\". ListWorkflows shows what's available."), *Workflow));
 	}
 	for (const TPair<FString, FString>& Pair : Inputs)
 	{
@@ -445,7 +446,7 @@ UToolCallAsyncResultString* UComfyToolset::GenerateMaterial(const FString& Promp
 	}
 	if (!Found)
 	{
-		return ErrorResult(TEXT("No texture workflow found. Pass one from list_workflows."));
+		return ErrorResult(TEXT("No texture workflow found. Pass one from ListWorkflows."));
 	}
 	FComfyWorkflowInput PromptInput;
 	if (!Found->FindInput(TEXT("prompt"), PromptInput))
