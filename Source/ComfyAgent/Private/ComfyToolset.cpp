@@ -43,7 +43,7 @@ namespace ComfyToolsetPrivate
 	}
 
 	/** Report a tool error the way the toolset registry expects, and return an empty result. */
-	static FString Error(const FString& Message)
+	static FString ToolError(const FString& Message)
 	{
 		UKismetSystemLibrary::RaiseScriptError(Message);
 		return FString();
@@ -209,7 +209,7 @@ FString UComfyToolset::ListBackends()
 	UComfySubsystem* Subsystem = Comfy();
 	if (!Subsystem)
 	{
-		return Error(TEXT("The Comfy subsystem isn't running."));
+		return ToolError(TEXT("The Comfy subsystem isn't running."));
 	}
 	TArray<TSharedPtr<FJsonValue>> Backends;
 	for (const FName Name : Subsystem->GetBackendNames())
@@ -274,7 +274,7 @@ FString UComfyToolset::SetActiveBackend(const FString& Backend)
 	FComfyBackendProfile Profile;
 	if (!Comfy() || !Comfy()->GetBackendProfile(FName(*Backend), Profile))
 	{
-		return Error(FString::Printf(TEXT("No backend named \"%s\"."), *Backend));
+		return ToolError(FString::Printf(TEXT("No backend named \"%s\"."), *Backend));
 	}
 	Comfy()->SetActiveBackend(FName(*Backend), true);
 	return ListBackends();
@@ -298,7 +298,7 @@ FString UComfyToolset::DescribeWorkflow(const FString& Workflow)
 	const UComfyWorkflow* Found = UComfyEditorLibrary::FindWorkflow(Workflow);
 	if (!Found)
 	{
-		return Error(FString::Printf(TEXT("No workflow named \"%s\". list_workflows shows what's available."), *Workflow));
+		return ToolError(FString::Printf(TEXT("No workflow named \"%s\". list_workflows shows what's available."), *Workflow));
 	}
 	return Write(WorkflowJson(Found, true));
 }
@@ -308,23 +308,23 @@ FString UComfyToolset::RunWorkflow(const FString& Workflow, const TMap<FString, 
 	UComfyWorkflow* Found = UComfyEditorLibrary::FindWorkflow(Workflow);
 	if (!Found)
 	{
-		return Error(FString::Printf(TEXT("No workflow named \"%s\". list_workflows shows what's available."), *Workflow));
+		return ToolError(FString::Printf(TEXT("No workflow named \"%s\". list_workflows shows what's available."), *Workflow));
 	}
 	for (const TPair<FString, FString>& Pair : Inputs)
 	{
 		FComfyWorkflowInput Input;
 		if (!Found->FindInput(Pair.Key, Input))
 		{
-			return Error(FString::Printf(TEXT("Workflow %s has no input \"%s\". Its inputs are: %s."), *Found->GetName(), *Pair.Key, *FString::Join(Found->GetInputNames(), TEXT(", "))));
+			return ToolError(FString::Printf(TEXT("Workflow %s has no input \"%s\". Its inputs are: %s."), *Found->GetName(), *Pair.Key, *FString::Join(Found->GetInputNames(), TEXT(", "))));
 		}
 	}
 	FString CreditError;
 	if (!CreditsAllowed(BackendName(Backend), Found, bAllowCreditSpend, false, CreditError))
 	{
-		return Error(CreditError);
+		return ToolError(CreditError);
 	}
 	UComfyJob* Job = Comfy()->RunWorkflow(Found, WithRandomSeed(Found, Inputs), BackendName(Backend));
-	return Job ? Job->ToJson() : Error(TEXT("The job couldn't start. See the Output Log."));
+	return Job ? Job->ToJson() : ToolError(TEXT("The job couldn't start. See the Output Log."));
 }
 
 UToolCallAsyncResultString* UComfyToolset::WaitForJob(const FString& JobId, int32 TimeoutSeconds)
@@ -353,7 +353,7 @@ FString UComfyToolset::GetJob(const FString& JobId)
 {
 	FString Message;
 	const UComfyJob* Job = FindJob(JobId, Message);
-	return Job ? Job->ToJson() : Error(Message);
+	return Job ? Job->ToJson() : ToolError(Message);
 }
 
 FString UComfyToolset::ListJobs()
@@ -376,7 +376,7 @@ FString UComfyToolset::CancelJob(const FString& JobId)
 	UComfyJob* Job = FindJob(JobId, Message);
 	if (!Job)
 	{
-		return Error(Message);
+		return ToolError(Message);
 	}
 	Job->Cancel();
 	return Job->ToJson();
@@ -388,11 +388,11 @@ FString UComfyToolset::ImportJobOutputs(const FString& JobId, const FString& Des
 	UComfyJob* Job = FindJob(JobId, Message);
 	if (!Job)
 	{
-		return Error(Message);
+		return ToolError(Message);
 	}
 	if (!Job->Succeeded())
 	{
-		return Error(FString::Printf(TEXT("Job %s is %s, not succeeded."), *JobId, *Job->GetStateText()));
+		return ToolError(FString::Printf(TEXT("Job %s is %s, not succeeded."), *JobId, *Job->GetStateText()));
 	}
 	TArray<TSharedPtr<FJsonValue>> Assets;
 	for (const UObject* Asset : UComfyEditorLibrary::ImportJobOutputs(Job, DestinationPath, true))
@@ -413,13 +413,13 @@ FString UComfyToolset::CreateMaterialFromJob(const FString& JobId, const FString
 	UComfyJob* Job = FindJob(JobId, Message);
 	if (!Job)
 	{
-		return Error(Message);
+		return ToolError(Message);
 	}
 	FComfyMaterialOptions Options;
 	UMaterialInstanceConstant* Material = UComfyEditorLibrary::CreateMaterialFromJob(Job, DestinationPath, MaterialName, Options);
 	if (!Material)
 	{
-		return Error(FString::Printf(TEXT("Couldn't build a material from job %s. It needs to have succeeded with an image output."), *JobId));
+		return ToolError(FString::Printf(TEXT("Couldn't build a material from job %s. It needs to have succeeded with an image output."), *JobId));
 	}
 	const int32 Assigned = bAssignToSelection ? UComfyEditorLibrary::AssignMaterialToSelectedActors(Material) : 0;
 	return Write(MaterialJson(Material, Assigned));
@@ -501,7 +501,7 @@ FString UComfyToolset::ImportWorkflow(const FString& FilePath, const FString& De
 {
 	FString Message;
 	const UComfyWorkflow* Workflow = UComfyEditorLibrary::ImportWorkflowFromFile(FilePath, DestinationPath, Message);
-	return Workflow ? Write(WorkflowJson(Workflow, true)) : Error(Message);
+	return Workflow ? Write(WorkflowJson(Workflow, true)) : ToolError(Message);
 }
 
 UToolCallAsyncResultString* UComfyToolset::ListRouterModels(const FString& Cursor)
@@ -525,8 +525,8 @@ FString UComfyToolset::RunRouterModel(const FString& ModelId, const FString& Req
 	FString CreditError;
 	if (!CreditsAllowed(NAME_None, nullptr, bAllowCreditSpend, true, CreditError))
 	{
-		return Error(CreditError);
+		return ToolError(CreditError);
 	}
 	UComfyJob* Job = Comfy()->RunRouterModel(ModelId, RequestJson, NAME_None);
-	return Job ? Job->ToJson() : Error(TEXT("The Router call couldn't start. See the Output Log."));
+	return Job ? Job->ToJson() : ToolError(TEXT("The Router call couldn't start. See the Output Log."));
 }

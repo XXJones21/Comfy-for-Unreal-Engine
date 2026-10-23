@@ -72,7 +72,10 @@ namespace ComfyWorkflowPrivate
 	static TArray<FString> SortedNodeIds(const TSharedPtr<FJsonObject>& Graph)
 	{
 		TArray<FString> Ids;
-		Graph->Values.GetKeys(Ids);
+		for (const auto& Pair : Graph->Values)
+		{
+			Ids.Add(FString(Pair.Key));
+		}
 		Ids.Sort([](const FString& A, const FString& B)
 		{
 			const bool bANum = A.IsNumeric();
@@ -520,16 +523,16 @@ FString UComfyWorkflow::GetInputSchemaJson() const
 			Prop->SetStringField(TEXT("type"), TEXT("string"));
 			break;
 		}
-		FString Description = Input.Label;
+		FString PropDescription = Input.Label;
 		if (Input.Type == EComfyInputType::File)
 		{
-			Description += TEXT(". Absolute path of a local file to upload.");
+			PropDescription += TEXT(". Absolute path of a local file to upload.");
 		}
 		if (Input.Type == EComfyInputType::Seed)
 		{
-			Description += TEXT(". Use \"random\" for a new seed.");
+			PropDescription += TEXT(". Use \"random\" for a new seed.");
 		}
-		Prop->SetStringField(TEXT("description"), Description);
+		Prop->SetStringField(TEXT("description"), PropDescription);
 		Prop->SetStringField(TEXT("default"), Input.DefaultValue);
 		if (Input.Options.Num() > 0)
 		{

@@ -43,16 +43,16 @@ namespace ComfyHttp
 			FString ErrorString;
 			if (Json->TryGetObjectField(TEXT("error"), ErrorObject) && ErrorObject)
 			{
-				FString Code;
-				(*ErrorObject)->TryGetStringField(TEXT("code"), Code);
+				FString ErrorCode;
+				(*ErrorObject)->TryGetStringField(TEXT("code"), ErrorCode);
 				(*ErrorObject)->TryGetStringField(TEXT("message"), Message);
 				if (Message.IsEmpty())
 				{
-					(*ErrorObject)->TryGetStringField(TEXT("type"), Code);
+					(*ErrorObject)->TryGetStringField(TEXT("type"), ErrorCode);
 				}
-				if (!Code.IsEmpty())
+				if (!ErrorCode.IsEmpty())
 				{
-					Message = FString::Printf(TEXT("%s (%s)"), *Message, *Code);
+					Message = FString::Printf(TEXT("%s (%s)"), *Message, *ErrorCode);
 				}
 			}
 			else if (Json->TryGetStringField(TEXT("error"), ErrorString))

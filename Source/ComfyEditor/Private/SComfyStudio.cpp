@@ -93,8 +93,8 @@ void SComfyStudio::Construct(const FArguments& InArgs)
 
 	if (UComfySubsystem* Comfy = UComfySubsystem::Get())
 	{
-		JobAddedHandle = Comfy->OnJobAdded.AddSP(this, [this](UComfyJob*) { RefreshJobs(); });
-		StatusHandle = Comfy->OnBackendStatus.AddSP(this, [this](const FComfyBackendStatus&) { /* Status text is bound and refreshes itself. */ });
+		JobAddedHandle = Comfy->OnJobAdded.AddSPLambda(this, [this](UComfyJob*) { RefreshJobs(); });
+		StatusHandle = Comfy->OnBackendStatus.AddSPLambda(this, [this](const FComfyBackendStatus&) { /* Status text is bound and refreshes itself. */ });
 		ActiveBackendHandle = Comfy->OnActiveBackendChanged.AddSP(this, &SComfyStudio::RefreshBackends);
 	}
 
