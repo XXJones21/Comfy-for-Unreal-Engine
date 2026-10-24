@@ -171,7 +171,7 @@ void UComfySubsystem::ProbeBackend(FName Backend, FComfyBackendStatusDelegate On
 			Finish(Status);
 			return;
 		}
-		ComfyHttp::Send(TEXT("GET"), Profile.BaseUrl + TEXT("/v2/models?limit=1"), { { TEXT("X-API-Key"), Key } }, [Status, Profile, Finish](const ComfyHttp::FResponse& Response) mutable
+		ComfyHttp::Send(TEXT("GET"), Profile.BaseUrl + TEXT("/v2/models?limit=1"), { { TEXT("Authorization"), TEXT("Bearer ") + Key } }, [Status, Profile, Finish](const ComfyHttp::FResponse& Response) mutable
 		{
 			Status.bReachable = Response.IsOk();
 			Status.Summary = Response.IsOk() ? FString::Printf(TEXT("Comfy Router at %s, key accepted"), *Profile.BaseUrl) : Response.Describe(TEXT("Comfy Router"));
@@ -605,7 +605,7 @@ UComfyJob* UComfySubsystem::RunRouterModel(const FString& ModelId, const FString
 		return Job;
 	}
 
-	const ComfyHttp::FHeaders Headers = { { TEXT("X-API-Key"), Key }, { TEXT("Idempotency-Key"), ComfyHttp::NewIdempotencyKey() } };
+	const ComfyHttp::FHeaders Headers = { { TEXT("Authorization"), TEXT("Bearer ") + Key }, { TEXT("Idempotency-Key"), ComfyHttp::NewIdempotencyKey() } };
 	TWeakObjectPtr<UComfyJob> WeakJob = Job;
 	TWeakObjectPtr<UComfySubsystem> WeakThis = this;
 	Job->SetState(EComfyJobState::Queued);
@@ -632,7 +632,7 @@ UComfyJob* UComfySubsystem::RunRouterModel(const FString& ModelId, const FString
 		if (Response.Json->TryGetStringField(TEXT("cancel_url"), Link)) CancelUrl = ComfyHttp::ResolveLink(Profile.BaseUrl, Link);
 		Job->CancelHandler = [CancelUrl, Key]()
 		{
-			ComfyHttp::Send(TEXT("PUT"), CancelUrl, { { TEXT("X-API-Key"), Key } }, [](const ComfyHttp::FResponse&) {});
+			ComfyHttp::Send(TEXT("PUT"), CancelUrl, { { TEXT("Authorization"), TEXT("Bearer ") + Key } }, [](const ComfyHttp::FResponse&) {});
 		};
 		This->RouterPoll(Job, Profile, Key, StatusUrl, ResponseUrl, FPlatformTime::Seconds());
 	});
@@ -652,7 +652,7 @@ void UComfySubsystem::RouterPoll(UComfyJob* Job, FComfyBackendProfile Profile, F
 	}
 	TWeakObjectPtr<UComfyJob> WeakJob = Job;
 	TWeakObjectPtr<UComfySubsystem> WeakThis = this;
-	ComfyHttp::Send(TEXT("GET"), StatusUrl, { { TEXT("X-API-Key"), ApiKey } }, [WeakJob, WeakThis, Profile, ApiKey, StatusUrl, ResponseUrl, StartSeconds](const ComfyHttp::FResponse& Response)
+	ComfyHttp::Send(TEXT("GET"), StatusUrl, { { TEXT("Authorization"), TEXT("Bearer ") + ApiKey } }, [WeakJob, WeakThis, Profile, ApiKey, StatusUrl, ResponseUrl, StartSeconds](const ComfyHttp::FResponse& Response)
 	{
 		UComfyJob* Job = WeakJob.Get();
 		UComfySubsystem* This = WeakThis.Get();
@@ -699,7 +699,7 @@ void UComfySubsystem::RouterCollect(UComfyJob* Job, FComfyBackendProfile Profile
 	using namespace ComfyRouterPrivate;
 
 	TWeakObjectPtr<UComfyJob> WeakJob = Job;
-	ComfyHttp::Send(TEXT("GET"), ResponseUrl, { { TEXT("X-API-Key"), ApiKey } }, [WeakJob, Profile, ApiKey](const ComfyHttp::FResponse& Response)
+	ComfyHttp::Send(TEXT("GET"), ResponseUrl, { { TEXT("Authorization"), TEXT("Bearer ") + ApiKey } }, [WeakJob, Profile, ApiKey](const ComfyHttp::FResponse& Response)
 	{
 		UComfyJob* Job = WeakJob.Get();
 		if (!Job || Job->IsFinished())
@@ -787,7 +787,7 @@ void UComfySubsystem::RouterCollect(UComfyJob* Job, FComfyBackendProfile Profile
 			File.LocalPath = Job->GetOutputDirectory() / File.FileName;
 			Job->Outputs.Add(File);
 			const bool bSameOrigin = ComfyHttp::Origin(Url) == ComfyHttp::Origin(Profile.BaseUrl);
-			ComfyHttp::Download(Url, bSameOrigin ? ComfyHttp::FHeaders{ { TEXT("X-API-Key"), ApiKey } } : ComfyHttp::FHeaders(), File.LocalPath, [WeakJob, Pending](bool bOk, const FString& Error)
+			ComfyHttp::Download(Url, bSameOrigin ? ComfyHttp::FHeaders{ { TEXT("Authorization"), TEXT("Bearer ") + ApiKey } } : ComfyHttp::FHeaders(), File.LocalPath, [WeakJob, Pending](bool bOk, const FString& Error)
 			{
 				UComfyJob* Job = WeakJob.Get();
 				if (!Job || Pending->bFailed)
@@ -839,7 +839,7 @@ void UComfySubsystem::GetRouterModelSchemaNative(const FString& ModelId, TFuncti
 		OnResult(false, TEXT("No Comfy Router backend configured."));
 		return;
 	}
-	ComfyHttp::Send(TEXT("GET"), ComfyRouterPrivate::ModelPath(Profile, ModelId) + TEXT("/openapi.json"), { { TEXT("X-API-Key"), ResolveApiKey(Profile) } }, [OnResult, ModelId](const ComfyHttp::FResponse& Response)
+	ComfyHttp::Send(TEXT("GET"), ComfyRouterPrivate::ModelPath(Profile, ModelId) + TEXT("/openapi.json"), { { TEXT("Authorization"), TEXT("Bearer ") + ResolveApiKey(Profile) } }, [OnResult, ModelId](const ComfyHttp::FResponse& Response)
 	{
 		OnResult(Response.IsOk(), Response.IsOk() ? Response.Body : Response.Describe(FString::Printf(TEXT("Schema for %s"), *ModelId)));
 	});
@@ -863,7 +863,7 @@ void UComfySubsystem::ListRouterModelsNative(const FString& Cursor, TFunction<vo
 	{
 		Url += TEXT("&cursor=") + ComfyHttp::UrlEncode(Cursor);
 	}
-	ComfyHttp::Send(TEXT("GET"), Url, { { TEXT("X-API-Key"), ResolveApiKey(Profile) } }, [OnResult](const ComfyHttp::FResponse& Response)
+	ComfyHttp::Send(TEXT("GET"), Url, { { TEXT("Authorization"), TEXT("Bearer ") + ResolveApiKey(Profile) } }, [OnResult](const ComfyHttp::FResponse& Response)
 	{
 		OnResult(Response.IsOk(), Response.IsOk() ? Response.Body : Response.Describe(TEXT("Listing Router models")));
 	});
