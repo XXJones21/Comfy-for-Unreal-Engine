@@ -531,3 +531,10 @@ FString UComfyToolset::RunRouterModel(const FString& ModelId, const FString& Req
 	UComfyJob* Job = Comfy()->RunRouterModel(ModelId, RequestJson, NAME_None);
 	return Job ? Job->ToJson() : ToolError(TEXT("The Router call couldn't start. See the Output Log."));
 }
+
+FString UComfyToolset::OpenStudio(const FString& View)
+{
+	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+	Result->SetBoolField(TEXT("opened"), UComfyEditorLibrary::OpenStudio(View));
+	return Write(Result);
+}

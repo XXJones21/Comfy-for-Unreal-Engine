@@ -171,4 +171,12 @@ public:
 	 */
 	UFUNCTION(meta = (AICallable), Category = "Comfy")
 	static FString RunRouterModel(const FString& ModelId, const FString& RequestJson, bool bAllowCreditSpend);
+
+	/**
+	 * Show the Comfy Studio panel to the user.
+	 * @param View "Run" for the workflow form and jobs, "Graph" for the ComfyUI graph editor. Empty keeps the current view.
+	 * @return JSON: {opened}
+	 */
+	UFUNCTION(meta = (AICallable), Category = "Comfy")
+	static FString OpenStudio(const FString& View);
 };

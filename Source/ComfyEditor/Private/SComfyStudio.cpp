@@ -52,6 +52,20 @@ namespace ComfyStudioPrivate
 	}
 }
 
+TWeakPtr<SComfyStudio> SComfyStudio::Instance;
+
+void SComfyStudio::SetActiveView(const FString& View)
+{
+	if (const TSharedPtr<SComfyStudio> Studio = Instance.Pin())
+	{
+		Studio->ShowView(View);
+	}
+}
+
+void SComfyStudio::ShowView(const FString& View)
+{
+}
+
 void SComfyStudio::Construct(const FArguments& InArgs)
 {
 	DestinationFolder = GetDefault<UComfySettings>()->DefaultImportFolder;
@@ -102,6 +116,7 @@ void SComfyStudio::Construct(const FArguments& InArgs)
 	RefreshWorkflows();
 	RefreshJobs();
 	CheckActiveBackend();
+	Instance = SharedThis(this);
 }
 
 SComfyStudio::~SComfyStudio()

@@ -1,6 +1,9 @@
 // Copyright Comfy Org. All Rights Reserved.
 
 #include "ComfyEditorLibrary.h"
+#include "ComfyEditorModule.h"
+#include "Framework/Docking/TabManager.h"
+#include "Widgets/Docking/SDockTab.h"
 #include "ComfyCoreModule.h"
 #include "ComfyJob.h"
 #include "ComfyProvenanceUserData.h"
@@ -572,6 +575,16 @@ UComfyProvenanceUserData* UComfyEditorLibrary::GetProvenance(UObject* Asset)
 {
 	IInterface_AssetUserData* Owner = Cast<IInterface_AssetUserData>(Asset);
 	return Owner ? Cast<UComfyProvenanceUserData>(Owner->GetAssetUserDataOfClass(UComfyProvenanceUserData::StaticClass())) : nullptr;
+}
+
+bool UComfyEditorLibrary::OpenStudio(const FString& View)
+{
+	const TSharedPtr<SDockTab> Tab = FGlobalTabmanager::Get()->TryInvokeTab(FComfyEditorModule::StudioTabName);
+	if (Tab.IsValid() && !View.IsEmpty())
+	{
+		FComfyEditorModule::SetStudioView(View);
+	}
+	return Tab.IsValid();
 }
 
 #undef LOCTEXT_NAMESPACE

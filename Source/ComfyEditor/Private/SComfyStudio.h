@@ -25,6 +25,9 @@ public:
 	void Construct(const FArguments& InArgs);
 	virtual ~SComfyStudio() override;
 
+	/** Switch the open panel to "Run" or "Graph". */
+	static void SetActiveView(const FString& View);
+
 private:
 	struct FWorkflowItem
 	{
@@ -86,6 +89,11 @@ private:
 
 	TArray<TSharedPtr<FJobItem>> JobItems;
 	TSharedPtr<SListView<TSharedPtr<FJobItem>>> JobList;
+
+	void ShowView(const FString& View);
+
+	/** The open panel, for SetActiveView. Comfy Studio is a single nomad tab. */
+	static TWeakPtr<SComfyStudio> Instance;
 
 	FDelegateHandle JobAddedHandle;
 	FDelegateHandle StatusHandle;

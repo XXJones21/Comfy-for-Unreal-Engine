@@ -104,4 +104,8 @@ public:
 
 	/** Package-safe asset name from free text. */
 	static FString MakeAssetName(const FString& Prefix, const FString& Text);
+
+	/** Open the Comfy Studio tab, or bring it to the front. View is "Run" or "Graph"; empty keeps the current one. */
+	UFUNCTION(BlueprintCallable, Category = "Comfy|Editor")
+	static bool OpenStudio(const FString& View);
 };

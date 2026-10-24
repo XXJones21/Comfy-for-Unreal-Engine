@@ -14,6 +14,11 @@
 
 const FName FComfyEditorModule::StudioTabName(TEXT("ComfyStudio"));
 
+void FComfyEditorModule::SetStudioView(const FString& View)
+{
+	SComfyStudio::SetActiveView(View);
+}
+
 void FComfyEditorModule::StartupModule()
 {
 	FComfyEditorStyle::Register();

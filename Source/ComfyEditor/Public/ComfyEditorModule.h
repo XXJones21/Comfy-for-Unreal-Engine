@@ -10,6 +10,9 @@ class FComfyEditorModule : public IModuleInterface
 public:
 	static const FName StudioTabName;
 
+	/** Switch an open Comfy Studio to "Run" or "Graph". Does nothing when the tab isn't open. */
+	static COMFYEDITOR_API void SetStudioView(const FString& View);
+
 	virtual void StartupModule() override;
 	virtual void ShutdownModule() override;
 
