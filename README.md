@@ -62,6 +62,15 @@ See [docs/SPEC.md](docs/SPEC.md) for the full UI and API outline.
 | ComfyEditor | Editor | Comfy Studio tab, workflow importer and reimport, asset definition, output import, PBR material builder |
 | ComfyAgent | Editor | `UComfyToolset` registered with the ToolsetRegistry for Unreal MCP |
 
+## Troubleshooting
+
+- **Desktop says "couldn't connect".** The `Desktop` profile defaults to `http://127.0.0.1:8188`. Comfy Desktop, a portable install or a WSL bridge may use another port (a portable install started with `--port 8189`, or a Windows `netsh interface portproxy` rule that holds 8188 and forwards it elsewhere). Check with `netsh interface portproxy show all` and `netstat -ano | findstr LISTENING`, then set the profile's URL in **Project Settings > Plugins > Comfy**. A project can override the whole list in `Config/DefaultGame.ini` under `[/Script/ComfyCore.ComfySettings]`.
+- **Cloud or Router says the key was refused (401).** The key is read from the profile's environment variable (`COMFY_API_KEY`), then `COMFY_CLOUD_API_KEY` (comfy-cli's workspace key), then Editor Preferences. Environment variables reach the editor only when whatever launched it started after they were set, so restart the launcher, or start the editor from a new terminal.
+
+## Credits
+
+The toolbar, menu, tab and asset icon is the Comfy logo, resized from `comfy-icon-512.png` in the ComfyUI frontend (`comfyui_frontend_package` 1.53.10, `static/assets/images/`). Its package metadata names no license; the frontend source is [Comfy-Org/ComfyUI_frontend](https://github.com/Comfy-Org/ComfyUI_frontend), and the logo is Comfy Org's mark. Confirm terms with Comfy Org before a public release.
+
 ## Status
 
 Proof of concept. Known gaps: runtime sound loading needs 16-bit PCM WAV (FLAC imports fine in the editor); Comfy Cloud's job listing isn't used; no workflow editing inside Unreal yet (edit in ComfyUI and reimport).

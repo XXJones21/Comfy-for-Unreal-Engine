@@ -1,6 +1,7 @@
 // Copyright Comfy Org. All Rights Reserved.
 
 #include "ComfyEditorModule.h"
+#include "ComfyEditorStyle.h"
 #include "SComfyStudio.h"
 #include "Framework/Docking/TabManager.h"
 #include "Styling/AppStyle.h"
@@ -15,11 +16,13 @@ const FName FComfyEditorModule::StudioTabName(TEXT("ComfyStudio"));
 
 void FComfyEditorModule::StartupModule()
 {
+	FComfyEditorStyle::Register();
+
 	FGlobalTabmanager::Get()->RegisterNomadTabSpawner(StudioTabName, FOnSpawnTab::CreateRaw(this, &FComfyEditorModule::SpawnStudioTab))
 		.SetDisplayName(LOCTEXT("StudioTabTitle", "Comfy Studio"))
 		.SetTooltipText(LOCTEXT("StudioTabTooltip", "Run ComfyUI workflows and import the results."))
 		.SetGroup(WorkspaceMenu::GetMenuStructure().GetToolsCategory())
-		.SetIcon(FSlateIcon(FAppStyle::GetAppStyleSetName(), "ClassIcon.Texture2D"));
+		.SetIcon(FComfyEditorStyle::GetIcon());
 
 	UToolMenus::RegisterStartupCallback(FSimpleMulticastDelegate::FDelegate::CreateRaw(this, &FComfyEditorModule::RegisterMenus));
 }
@@ -32,6 +35,7 @@ void FComfyEditorModule::ShutdownModule()
 	{
 		FGlobalTabmanager::Get()->UnregisterNomadTabSpawner(StudioTabName);
 	}
+	FComfyEditorStyle::Unregister();
 }
 
 void FComfyEditorModule::RegisterMenus()
@@ -41,12 +45,15 @@ void FComfyEditorModule::RegisterMenus()
 	// Toolbar button next to the other level editor tools.
 	UToolMenu* Toolbar = UToolMenus::Get()->ExtendMenu("LevelEditor.LevelEditorToolBar.User");
 	FToolMenuSection& Section = Toolbar->FindOrAddSection("Comfy");
-	Section.AddEntry(FToolMenuEntry::InitToolBarButton(
+	FToolMenuEntry Entry = FToolMenuEntry::InitToolBarButton(
 		"OpenComfyStudio",
 		FUIAction(FExecuteAction::CreateLambda([]() { FGlobalTabmanager::Get()->TryInvokeTab(FComfyEditorModule::StudioTabName); })),
 		LOCTEXT("ToolbarLabel", "Comfy"),
 		LOCTEXT("ToolbarTooltip", "Open Comfy Studio"),
-		FSlateIcon(FAppStyle::GetAppStyleSetName(), "ClassIcon.Texture2D")));
+		FComfyEditorStyle::GetIcon());
+	// The style the level toolbar's own Settings button uses, so "Comfy" shows next to the logo in compact mode too.
+	Entry.StyleNameOverride = "CalloutToolbar";
+	Section.AddEntry(Entry);
 }
 
 TSharedRef<SDockTab> FComfyEditorModule::SpawnStudioTab(const FSpawnTabArgs& Args)

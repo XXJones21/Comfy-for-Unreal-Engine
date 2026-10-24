@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "AssetDefinitionDefault.h"
+#include "ComfyEditorStyle.h"
 #include "ComfyWorkflow.h"
 #include "AssetDefinition_ComfyWorkflow.generated.h"
 
@@ -20,5 +21,13 @@ public:
 	{
 		static const FAssetCategoryPath Categories[] = { FAssetCategoryPath(NSLOCTEXT("ComfyEditor", "Category", "Comfy")) };
 		return Categories;
+	}
+	virtual const FSlateBrush* GetThumbnailBrush(const FAssetData& InAssetData, const FName InClassName) const override
+	{
+		return FComfyEditorStyle::Get().GetBrush("ComfyUnreal.Icon");
+	}
+	virtual const FSlateBrush* GetIconBrush(const FAssetData& InAssetData, const FName InClassName) const override
+	{
+		return FComfyEditorStyle::Get().GetBrush("ComfyUnreal.Icon.Small");
 	}
 };
