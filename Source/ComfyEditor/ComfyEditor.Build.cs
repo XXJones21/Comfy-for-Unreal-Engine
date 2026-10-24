@@ -25,6 +25,8 @@ public class ComfyEditor : ModuleRules
 			"ContentBrowser",
 			"DesktopPlatform",
 			"EditorFramework",
+			"EditorWidgets",
+			"ImageCore",
 			"InputCore",
 			"Json",
 			"MaterialEditor",

@@ -3,20 +3,18 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Containers/Ticker.h"
 #include "Widgets/SCompoundWidget.h"
-#include "Widgets/Views/SListView.h"
 #include "ComfyTypes.h"
 
-class UComfyJob;
-class UComfyWorkflow;
 class SComfyGraph;
-class SVerticalBox;
+class SComfyRunView;
 class SWidgetSwitcher;
 template <typename OptionType> class SComboBox;
 
 /**
- * The Comfy Studio tab: pick a backend and a workflow, fill in its inputs, run it, and
- * watch jobs land in the project as textures, materials, sounds and meshes.
+ * The Comfy Studio tab: a slim status line over two views. Run is laid out like ComfyUI's App mode;
+ * Graph is the ComfyUI frontend itself. Generated assets land in the project.
  */
 class SComfyStudio : public SCompoundWidget
 {
@@ -31,77 +29,38 @@ public:
 	static void SetActiveView(const FString& View);
 
 private:
-	struct FWorkflowItem
+	enum class EConnection : uint8
 	{
-		TWeakObjectPtr<UComfyWorkflow> Workflow;
-	};
-	struct FJobItem
-	{
-		TWeakObjectPtr<UComfyJob> Job;
+		Unknown,
+		Connecting,
+		Connected,
+		Failed,
 	};
 
-	// Backend bar
-	TSharedRef<SWidget> BuildBackendBar();
+	TSharedRef<SWidget> BuildStatusLine();
 	void RefreshBackends();
 	void CheckActiveBackend();
 	void HandleBackendStatus(const FComfyBackendStatus& Status);
+	void HandleActiveBackendChanged();
 	FText GetStatusText() const;
 	FSlateColor GetStatusColor() const;
-
-	// Workflow library
-	TSharedRef<SWidget> BuildLibrary();
-	void RefreshWorkflows();
-	TSharedRef<ITableRow> MakeWorkflowRow(TSharedPtr<FWorkflowItem> Item, const TSharedRef<STableViewBase>& Owner);
-	void OnWorkflowSelected(TSharedPtr<FWorkflowItem> Item, ESelectInfo::Type SelectInfo);
-	FReply OnImportWorkflowClicked();
-
-	// Inputs form
-	TSharedRef<SWidget> BuildRunPanel();
-	void RebuildForm();
-	TSharedRef<SWidget> MakeInputWidget(const FComfyWorkflowInput& Input);
-	FText GetWarningText() const;
-	bool CanRun() const;
-	FReply OnRunClicked();
-
-	// Jobs
-	TSharedRef<SWidget> BuildJobList();
-	void RefreshJobs();
-	TSharedRef<ITableRow> MakeJobRow(TSharedPtr<FJobItem> Item, const TSharedRef<STableViewBase>& Owner);
-	void HandleJobFinished(UComfyJob* Job, bool bImport, bool bMaterial);
-
-	UComfyWorkflow* GetSelectedWorkflow() const { return SelectedWorkflow.Get(); }
-	bool SelectedMakesImages() const;
+	int32 GetActiveJobCount() const;
+	void ShowView(const FString& View);
+	void OpenInGraph(const class UComfyWorkflow* Workflow);
 
 	TArray<TSharedPtr<FName>> BackendOptions;
 	TSharedPtr<SComboBox<TSharedPtr<FName>>> BackendCombo;
-
-	TArray<TSharedPtr<FWorkflowItem>> WorkflowItems;
-	TSharedPtr<SListView<TSharedPtr<FWorkflowItem>>> WorkflowList;
-	TWeakObjectPtr<UComfyWorkflow> SelectedWorkflow;
-
-	TSharedPtr<SVerticalBox> FormBox;
-	TMap<FString, FString> InputValues;
-	/** Option lists for enum inputs; held here because combo boxes keep a pointer to them. */
-	TArray<TSharedPtr<TArray<TSharedPtr<FString>>>> EnumOptionLists;
-
-	FString DestinationFolder;
-	bool bImportResults = true;
-	bool bCreateMaterial = true;
-	bool bMakeTileable = true;
-	bool bAssignToSelection = false;
-
-	TArray<TSharedPtr<FJobItem>> JobItems;
-	TSharedPtr<SListView<TSharedPtr<FJobItem>>> JobList;
-
-	void ShowView(const FString& View);
+	EConnection Connection = EConnection::Unknown;
 
 	TSharedPtr<SWidgetSwitcher> ViewSwitcher;
+	TSharedPtr<SComfyRunView> RunView;
 	TSharedPtr<SComfyGraph> Graph;
 
 	/** The open panel, for SetActiveView. Comfy Studio is a single nomad tab. */
 	static TWeakPtr<SComfyStudio> Instance;
 
-	FDelegateHandle JobAddedHandle;
 	FDelegateHandle StatusHandle;
 	FDelegateHandle ActiveBackendHandle;
+	FDelegateHandle ServerWorkflowsHandle;
+	FTSTicker::FDelegateHandle HeartbeatHandle;
 };

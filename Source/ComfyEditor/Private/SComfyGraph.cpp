@@ -10,6 +10,7 @@
 #include "IWebBrowserPopupFeatures.h"
 #include "IWebBrowserSingleton.h"
 #include "IWebBrowserWindow.h"
+#include "Containers/Ticker.h"
 #include "Misc/Paths.h"
 #include "Modules/ModuleManager.h"
 #include "SWebBrowser.h"
@@ -205,9 +206,11 @@ void SComfyGraph::ShowBrowser(const FString& Url)
 		.ShowControls(false)
 		.ShowAddressBar(false)
 		.OnCreateWindow(this, &SComfyGraph::HandleCreateWindow)
-		.OnCloseWindow(this, &SComfyGraph::HandleCloseWindow));
+		.OnCloseWindow(this, &SComfyGraph::HandleCloseWindow)
+		.OnLoadCompleted(this, &SComfyGraph::HandleLoadCompleted));
 	Browser->BindUObject(TEXT("comfyunreal"), Bridge.Get(), true);
 	LoadedUrl = Url;
+	bPageLoading = true;
 	SetMessage(FText::Format(LOCTEXT("Showing", "ComfyUI at {0}"), FText::FromString(Url)), false);
 }
 
@@ -237,10 +240,40 @@ void SComfyGraph::HandleGraph(const FString& WorkflowJson, const FString& ApiJso
 
 FReply SComfyGraph::OnOpenSelected()
 {
-	const UComfyWorkflow* Workflow = SelectedWorkflow.Get();
-	if (!Browser.IsValid() || !Workflow)
+	OpenWorkflow(SelectedWorkflow.Get());
+	return FReply::Handled();
+}
+
+void SComfyGraph::HandleLoadCompleted()
+{
+	bPageLoading = false;
+	if (PendingWorkflow.IsValid())
 	{
-		return FReply::Handled();
+		// The ComfyUI app finishes starting a moment after the page's load event.
+		TWeakPtr<SComfyGraph> WeakThis = SharedThis(this);
+		FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateLambda([WeakThis](float)
+		{
+			if (const TSharedPtr<SComfyGraph> This = WeakThis.Pin())
+			{
+				const UComfyWorkflow* Pending = This->PendingWorkflow.Get();
+				This->PendingWorkflow.Reset();
+				This->OpenWorkflow(Pending);
+			}
+			return false;
+		}), 2.f);
+	}
+}
+
+void SComfyGraph::OpenWorkflow(const UComfyWorkflow* Workflow)
+{
+	if (!Workflow)
+	{
+		return;
+	}
+	if (!Browser.IsValid() || bPageLoading)
+	{
+		PendingWorkflow = Workflow;
+		return;
 	}
 	// The canvas save keeps the layout; an API graph gets laid out by the frontend.
 	const FString Body = Workflow->UiGraphJson.IsEmpty()
@@ -248,7 +281,6 @@ FReply SComfyGraph::OnOpenSelected()
 		: FString::Printf(TEXT("await app.loadGraphData(%s);"), *Workflow->UiGraphJson);
 	Browser->ExecuteJavascript(ComfyGraphPrivate::Wrap(Body));
 	SetMessage(FText::Format(LOCTEXT("Opened", "Opened {0} in the graph."), FText::FromString(Workflow->GetDisplayNameString())), false);
-	return FReply::Handled();
 }
 
 FReply SComfyGraph::OnReload()

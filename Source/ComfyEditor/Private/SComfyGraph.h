@@ -33,6 +33,9 @@ public:
 	/** Load the active backend's frontend, creating the browser on first use or when the backend changed. */
 	void Activate();
 
+	/** Load a workflow into the ComfyUI canvas: its canvas save when it has one, else its API graph. */
+	void OpenWorkflow(const UComfyWorkflow* Workflow);
+
 private:
 	FString GetFrontendUrl(FText& OutWhyNot) const;
 	void ShowBrowser(const FString& Url);
@@ -45,6 +48,7 @@ private:
 	FReply OnOpenInBrowser();
 
 	void HandleGraph(const FString& WorkflowJson, const FString& ApiJson, const FString& Name);
+	void HandleLoadCompleted();
 	bool HandleCreateWindow(const TWeakPtr<IWebBrowserWindow>& NewWindow, const TWeakPtr<IWebBrowserPopupFeatures>& Features);
 	bool HandleCloseWindow(const TWeakPtr<IWebBrowserWindow>& ClosingWindow);
 
@@ -54,6 +58,9 @@ private:
 	TSharedPtr<SBox> BrowserHost;
 	TSharedPtr<SWebBrowser> Browser;
 	FString LoadedUrl;
+	bool bPageLoading = false;
+	/** A workflow asked for before the page finished loading; opened once it has. */
+	TWeakObjectPtr<const UComfyWorkflow> PendingWorkflow;
 	TStrongObjectPtr<UComfyGraphBridge> Bridge;
 
 	FText Message;
