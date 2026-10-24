@@ -45,7 +45,7 @@ public:
 
 	/**
 	 * List the workflows available to run: workflow assets in the project and the plugin's built-in ones.
-	 * @param CategoryFilter Only list this category (for example Textures, Audio, Meshes). Empty lists all.
+	 * @param CategoryFilter Only list this workflow type: Material, Texture, Sound, Music, Mesh, Upscale or Other. Empty lists all.
 	 * @return JSON array: [{name, path, display_name, category, description, uses_credits, inputs, outputs}]
 	 */
 	UFUNCTION(meta = (AICallable), Category = "Comfy")

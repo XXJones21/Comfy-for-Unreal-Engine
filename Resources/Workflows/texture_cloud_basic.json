@@ -1,7 +1,8 @@
 {
   "comfy_unreal": {
+    "version": 1,
     "display_name": "Seamless Texture (Cloud)",
-    "category": "Textures",
+    "category": "Texture",
     "description": "A flat, evenly lit surface texture from a text prompt, built from core ComfyUI nodes only so it runs on Comfy Cloud's catalog as well as local installs. Uses whichever Flux Schnell or Flux Dev fp8 checkpoint the backend has (Cloud: flux1-schnell-fp8). Pair with Create material to get a tileable PBR material.",
     "inputs": [
       {
@@ -68,8 +69,8 @@
       {
         "name": "albedo",
         "node_id": "9",
-        "kind": "Image",
-        "import": "Texture"
+        "kind": "Texture",
+        "slot": "BaseColor"
       }
     ]
   },

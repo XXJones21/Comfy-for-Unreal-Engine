@@ -16,6 +16,7 @@ DECLARE_DYNAMIC_DELEGATE_TwoParams(FComfyTextResultDelegate, bool, bSuccess, con
 DECLARE_MULTICAST_DELEGATE_OneParam(FOnComfyJobAdded, UComfyJob*);
 DECLARE_MULTICAST_DELEGATE_OneParam(FOnComfyBackendStatus, const FComfyBackendStatus&);
 DECLARE_MULTICAST_DELEGATE(FOnComfyActiveBackendChanged);
+DECLARE_MULTICAST_DELEGATE(FOnComfyServerWorkflowsChanged);
 
 /**
  * Entry point for running Comfy workflows from C++, Blueprints and Python, in the editor
@@ -113,6 +114,21 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Comfy|Workflow")
 	TArray<UComfyWorkflow*> GetBuiltInWorkflows(bool bReload = false);
 
+	/**
+	 * Fetch the workflows the Comfy for Unreal ComfyUI extension saved on a local backend
+	 * (GET /comfy_unreal/workflows). Backends without the extension, and Comfy Cloud, simply have none.
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Comfy|Workflow")
+	void RefreshServerWorkflows(FName Backend = NAME_None);
+
+	/** The last fetched server workflows, as transient assets. */
+	UFUNCTION(BlueprintPure, Category = "Comfy|Workflow")
+	TArray<UComfyWorkflow*> GetServerWorkflows() const;
+
+	/** Tell the extension an Unreal editor is connected (POST /comfy_unreal/heartbeat). Comfy Studio sends one while it's open. */
+	UFUNCTION(BlueprintCallable, Category = "Comfy|Workflow")
+	void SendHeartbeat(FName Backend = NAME_None);
+
 	UFUNCTION(BlueprintPure, Category = "Comfy|Jobs")
 	TArray<UComfyJob*> GetJobs() const;
 
@@ -131,6 +147,7 @@ public:
 	FOnComfyJobAdded OnJobAdded;
 	FOnComfyBackendStatus OnBackendStatus;
 	FOnComfyActiveBackendChanged OnActiveBackendChanged;
+	FOnComfyServerWorkflowsChanged OnServerWorkflowsChanged;
 
 private:
 	UComfyJob* NewJob(FName Backend, const FString& Title);
@@ -149,6 +166,9 @@ private:
 
 	UPROPERTY(Transient)
 	TArray<TObjectPtr<UComfyWorkflow>> BuiltInWorkflows;
+
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<UComfyWorkflow>> ServerWorkflows;
 	bool bBuiltInsLoaded = false;
 
 	TMap<FName, TSharedPtr<IComfyBackend>> BackendInstances;

@@ -20,6 +20,12 @@
 #include "Engine/Selection.h"
 #include "Engine/Texture.h"
 #include "Engine/Texture2D.h"
+#include "Engine/StaticMesh.h"
+#include "EditorFramework/AssetImportData.h"
+#include "ImageUtils.h"
+#include "ImageCore.h"
+#include "UnrealClient.h"
+#include "Sound/SoundWave.h"
 #include "Factories/MaterialFactoryNew.h"
 #include "Factories/MaterialInstanceConstantFactoryNew.h"
 #include "FileHelpers.h"
@@ -285,6 +291,7 @@ TArray<UComfyWorkflow*> UComfyEditorLibrary::GetAllWorkflows()
 	if (UComfySubsystem* Comfy = UComfySubsystem::Get())
 	{
 		Result.Append(Comfy->GetBuiltInWorkflows());
+		Result.Append(Comfy->GetServerWorkflows());
 	}
 	return Result;
 }
@@ -668,8 +675,10 @@ UComfyWorkflow* UComfyEditorLibrary::SaveGraphAsWorkflow(const FString& Workflow
 		Workflow->DisplayName = FText::FromString(FPaths::GetBaseFilename(Name.IsEmpty() ? FString(TEXT("Graph")) : Name));
 	}
 
-	// App mode's chosen inputs replace the detected ones; anything it names that detection missed is added as text.
-	const TArray<TPair<FString, FString>> Linear = ComfyEditorPrivate::ReadLinearInputs(WorkflowJson);
+	// The Comfy for Unreal extension's manifest wins. Otherwise App mode's chosen inputs replace the detected ones,
+	// and anything it names that detection missed is added as text.
+	const bool bHasManifest = Workflow->ApplyManifestFromCanvas(WorkflowJson);
+	const TArray<TPair<FString, FString>> Linear = bHasManifest ? TArray<TPair<FString, FString>>() : ComfyEditorPrivate::ReadLinearInputs(WorkflowJson);
 	if (Linear.Num() > 0)
 	{
 		TArray<FComfyWorkflowInput> Chosen;
@@ -696,6 +705,76 @@ UComfyWorkflow* UComfyEditorLibrary::SaveGraphAsWorkflow(const FString& Workflow
 	Workflow->MarkPackageDirty();
 	ComfyEditorPrivate::SavePackagesOf({ Workflow });
 	return Workflow;
+}
+
+namespace ComfyEditorPrivate
+{
+	static FString InputsFolder()
+	{
+		return FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir() / TEXT("Comfy") / TEXT("Inputs"));
+	}
+}
+
+FString UComfyEditorLibrary::ExportAssetForInput(UObject* Asset, FString& OutError)
+{
+	if (UTexture2D* Texture = Cast<UTexture2D>(Asset))
+	{
+		FImage Image;
+		if (!FImageUtils::GetTexture2DSourceImage(Texture, Image))
+		{
+			OutError = FString::Printf(TEXT("%s has no source image to export."), *Texture->GetName());
+			return FString();
+		}
+		const FString Path = ComfyEditorPrivate::InputsFolder() / Texture->GetName() + TEXT(".png");
+		if (!FImageUtils::SaveImageByExtension(*Path, Image))
+		{
+			OutError = FString::Printf(TEXT("Couldn't write %s."), *Path);
+			return FString();
+		}
+		return Path;
+	}
+	// Meshes and sounds go as the file they came from; ComfyUI can't read Unreal's own formats.
+	UAssetImportData* ImportData = nullptr;
+	if (const UStaticMesh* Mesh = Cast<UStaticMesh>(Asset))
+	{
+		ImportData = Mesh->GetAssetImportData();
+	}
+	else if (const USoundWave* Sound = Cast<USoundWave>(Asset))
+	{
+		ImportData = Sound->AssetImportData;
+	}
+	const FString Source = ImportData ? ImportData->GetFirstFilename() : FString();
+	if (Source.IsEmpty() || !FPaths::FileExists(Source))
+	{
+		OutError = Asset ? FString::Printf(TEXT("%s has no source file on disk to send."), *Asset->GetName()) : FString(TEXT("Nothing selected."));
+		return FString();
+	}
+	return Source;
+}
+
+FString UComfyEditorLibrary::CaptureActiveViewport(FString& OutError)
+{
+	FViewport* Viewport = GEditor ? GEditor->GetActiveViewport() : nullptr;
+	TArray<FColor> Pixels;
+	if (!Viewport || !Viewport->ReadPixels(Pixels) || Pixels.Num() == 0)
+	{
+		OutError = TEXT("Couldn't read the active viewport.");
+		return FString();
+	}
+	const FIntPoint Size = Viewport->GetSizeXY();
+	FImage Image(Size.X, Size.Y, ERawImageFormat::BGRA8, EGammaSpace::sRGB);
+	FMemory::Memcpy(Image.RawData.GetData(), Pixels.GetData(), FMath::Min<int64>(Image.RawData.Num(), Pixels.Num() * sizeof(FColor)));
+	for (FColor& Pixel : Image.AsBGRA8())
+	{
+		Pixel.A = 255;
+	}
+	const FString Path = ComfyEditorPrivate::InputsFolder() / FString::Printf(TEXT("Viewport_%s.png"), *FDateTime::Now().ToString(TEXT("%Y%m%d_%H%M%S")));
+	if (!FImageUtils::SaveImageByExtension(*Path, Image))
+	{
+		OutError = FString::Printf(TEXT("Couldn't write %s."), *Path);
+		return FString();
+	}
+	return Path;
 }
 
 bool UComfyEditorLibrary::OpenStudio(const FString& View)

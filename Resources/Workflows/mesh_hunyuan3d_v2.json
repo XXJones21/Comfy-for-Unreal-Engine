@@ -1,7 +1,8 @@
 {
   "comfy_unreal": {
+    "version": 1,
     "display_name": "Image to Mesh (Hunyuan3D 2)",
-    "category": "Meshes",
+    "category": "Mesh",
     "description": "An untextured 3D mesh from one reference image, saved as GLB and imported as a Static Mesh. Stock ComfyUI nodes. Needs hunyuan3d-dit-v2.safetensors in models/checkpoints and about 12 GB of VRAM. Use a centered object on a plain background.",
     "inputs": [
       {

@@ -113,6 +113,17 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Comfy|Editor")
 	static UComfyWorkflow* SaveGraphAsWorkflow(const FString& WorkflowJson, const FString& ApiJson, const FString& Name, FString& OutError);
 
+	/**
+	 * A file on disk for a workflow's File input from a project asset: a texture's source image is written to
+	 * Saved/Comfy/Inputs as PNG; a mesh or sound gives the file it was imported from. Empty with OutError otherwise.
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Comfy|Editor")
+	static FString ExportAssetForInput(UObject* Asset, FString& OutError);
+
+	/** Save the active level viewport as a PNG in Saved/Comfy/Inputs and return its path, for a File input. */
+	UFUNCTION(BlueprintCallable, Category = "Comfy|Editor")
+	static FString CaptureActiveViewport(FString& OutError);
+
 	/** Open the Comfy Studio tab, or bring it to the front. View is "Run" or "Graph"; empty keeps the current one. */
 	UFUNCTION(BlueprintCallable, Category = "Comfy|Editor")
 	static bool OpenStudio(const FString& View);

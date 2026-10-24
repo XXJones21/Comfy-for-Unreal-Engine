@@ -28,9 +28,13 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Workflow", meta = (MultiLine = true))
 	FText Description;
 
-	/** Grouping in the Comfy Studio library, for example "Textures", "Audio", "Meshes". */
+	/** Workflow type: Material, Texture, Sound, Music, Mesh, Upscale or Other. Older files say Textures, Audio, Meshes. */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Workflow", AssetRegistrySearchable)
 	FString Category;
+
+	/** Free grouping inside a type, from the manifest. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Workflow", AssetRegistrySearchable)
+	FString Group;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Manifest")
 	TArray<FComfyWorkflowInput> Inputs;
@@ -83,6 +87,15 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Comfy|Workflow")
 	FString GetInputSchemaJson() const;
 
+	/**
+	 * Apply the comfy_unreal manifest stored in a ComfyUI canvas save (extra.comfy_unreal), as the
+	 * Comfy for Unreal extension writes it. Returns false when the save carries none.
+	 */
+	bool ApplyManifestFromCanvas(const FString& CanvasJson);
+
+	/** Apply a comfy_unreal manifest object (docs/MANIFEST.md). Inputs and outputs it lists replace what detection found. */
+	void ApplyManifestObject(const TSharedPtr<FJsonObject>& Manifest);
+
 	/** Create a transient workflow from API-format JSON, for runtime use without an asset. */
 	UFUNCTION(BlueprintCallable, Category = "Comfy|Workflow")
 	static UComfyWorkflow* CreateTransientFromJson(const FString& Json, FString& OutError);
@@ -104,6 +117,4 @@ public:
 private:
 	TSharedPtr<FJsonObject> ParseGraph(FString& OutError) const;
 
-	/** Apply the "comfy_unreal" manifest that the plugin's bundled workflow files carry. */
-	void ApplyManifest(const TSharedPtr<FJsonObject>& Manifest);
 };

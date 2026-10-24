@@ -21,6 +21,7 @@
 #include "HAL/PlatformFileManager.h"
 #include "HAL/FileManager.h"
 #include "Interfaces/IPluginManager.h"
+#include "Misc/App.h"
 
 UComfySubsystem* UComfySubsystem::Get()
 {
@@ -956,4 +957,134 @@ TArray<UComfyWorkflow*> UComfySubsystem::GetBuiltInWorkflows(bool bReload)
 		}
 	}
 	return TArray<UComfyWorkflow*>(BuiltInWorkflows);
+}
+
+// ---------------------------------------------------------------------------------------------
+// Comfy for Unreal extension: the server's workflow library and the editor heartbeat
+
+namespace ComfyServerLibraryPrivate
+{
+	/** The extension's routes live on a ComfyUI server, so only local backends can have them. */
+	static bool ServerBase(const UComfySubsystem* Comfy, FName Backend, FString& OutBase)
+	{
+		FComfyBackendProfile Profile;
+		if (!Comfy->GetBackendProfile(Backend, Profile) || Profile.Kind != EComfyBackendKind::Local)
+		{
+			return false;
+		}
+		OutBase = Profile.BaseUrl;
+		OutBase.RemoveFromEnd(TEXT("/"));
+		return true;
+	}
+}
+
+void UComfySubsystem::RefreshServerWorkflows(FName Backend)
+{
+	FString Base;
+	if (!ComfyServerLibraryPrivate::ServerBase(this, Backend, Base))
+	{
+		if (ServerWorkflows.Num() > 0)
+		{
+			ServerWorkflows.Reset();
+			OnServerWorkflowsChanged.Broadcast();
+		}
+		return;
+	}
+	TWeakObjectPtr<UComfySubsystem> WeakThis = this;
+	ComfyHttp::Send(TEXT("GET"), Base + TEXT("/comfy_unreal/workflows"), {}, [WeakThis, Base](const ComfyHttp::FResponse& Response)
+	{
+		UComfySubsystem* This = WeakThis.Get();
+		if (!This)
+		{
+			return;
+		}
+		TArray<TSharedPtr<FJsonValue>> Items;
+		if (Response.IsOk())
+		{
+			TSharedPtr<FJsonValue> Parsed;
+			const TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(Response.Body);
+			if (FJsonSerializer::Deserialize(Reader, Parsed) && Parsed.IsValid() && Parsed->Type == EJson::Array)
+			{
+				Items = Parsed->AsArray();
+			}
+		}
+		This->ServerWorkflows.Reset();
+		if (Items.Num() == 0)
+		{
+			This->OnServerWorkflowsChanged.Broadcast();
+			return;
+		}
+		// Fetch each one; the list only carries summaries.
+		TSharedRef<int32> Remaining = MakeShared<int32>(Items.Num());
+		for (const TSharedPtr<FJsonValue>& Item : Items)
+		{
+			FString Id;
+			const TSharedPtr<FJsonObject> Summary = Item.IsValid() ? Item->AsObject() : nullptr;
+			if (!Summary.IsValid() || !Summary->TryGetStringField(TEXT("id"), Id))
+			{
+				--*Remaining;
+				continue;
+			}
+			const FString Url = Base + TEXT("/comfy_unreal/workflows/") + ComfyHttp::UrlEncode(Id);
+			ComfyHttp::Send(TEXT("GET"), Url, {}, [WeakThis, Url, Id, Remaining](const ComfyHttp::FResponse& File)
+			{
+				UComfySubsystem* This = WeakThis.Get();
+				if (!This)
+				{
+					return;
+				}
+				const TSharedPtr<FJsonObject>* Prompt = nullptr;
+				const TSharedPtr<FJsonObject>* Manifest = nullptr;
+				if (File.IsOk() && File.Json.IsValid() && File.Json->TryGetObjectField(TEXT("prompt"), Prompt) && File.Json->TryGetObjectField(TEXT("manifest"), Manifest))
+				{
+					const TSharedRef<FJsonObject> Bundle = MakeShared<FJsonObject>();
+					Bundle->SetObjectField(TEXT("comfy_unreal"), *Manifest);
+					Bundle->SetObjectField(TEXT("prompt"), *Prompt);
+					const FName ObjectName = MakeUniqueObjectName(This, UComfyWorkflow::StaticClass(), FName(*(TEXT("server_") + Id)));
+					UComfyWorkflow* Workflow = NewObject<UComfyWorkflow>(This, ObjectName, RF_Transient);
+					FString Error;
+					if (Workflow->SetGraphFromJson(ComfyHttp::JsonToString(Bundle), true, Error))
+					{
+						const TSharedPtr<FJsonObject>* Canvas = nullptr;
+						if (File.Json->TryGetObjectField(TEXT("workflow"), Canvas))
+						{
+							Workflow->UiGraphJson = ComfyHttp::JsonToString(Canvas->ToSharedRef());
+						}
+						Workflow->SourceFile = Url;
+						This->ServerWorkflows.Add(Workflow);
+					}
+					else
+					{
+						UE_LOG(LogComfy, Warning, TEXT("Skipped server workflow %s: %s"), *Id, *Error);
+					}
+				}
+				if (--*Remaining <= 0)
+				{
+					This->OnServerWorkflowsChanged.Broadcast();
+				}
+			}, 30.f);
+		}
+		if (*Remaining <= 0)
+		{
+			This->OnServerWorkflowsChanged.Broadcast();
+		}
+	}, 10.f);
+}
+
+TArray<UComfyWorkflow*> UComfySubsystem::GetServerWorkflows() const
+{
+	return TArray<UComfyWorkflow*>(ServerWorkflows);
+}
+
+void UComfySubsystem::SendHeartbeat(FName Backend)
+{
+	FString Base;
+	if (!ComfyServerLibraryPrivate::ServerBase(this, Backend, Base))
+	{
+		return;
+	}
+	const TSharedRef<FJsonObject> Body = MakeShared<FJsonObject>();
+	Body->SetStringField(TEXT("client"), TEXT("unreal"));
+	Body->SetStringField(TEXT("editor"), FApp::GetProjectName());
+	ComfyHttp::SendJson(TEXT("POST"), Base + TEXT("/comfy_unreal/heartbeat"), {}, Body, [](const ComfyHttp::FResponse&) {}, 5.f);
 }

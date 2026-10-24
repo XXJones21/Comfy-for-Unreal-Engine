@@ -99,7 +99,8 @@ namespace ComfyToolsetPrivate
 		Object->SetStringField(TEXT("name"), Workflow->GetName());
 		Object->SetStringField(TEXT("path"), Workflow->HasAnyFlags(RF_Transient) ? FString(TEXT("(built-in)")) : Workflow->GetPathName());
 		Object->SetStringField(TEXT("display_name"), Workflow->GetDisplayNameString());
-		Object->SetStringField(TEXT("category"), Workflow->Category);
+		Object->SetStringField(TEXT("category"), ComfyTypes::NormalizeCategory(Workflow->Category));
+		Object->SetStringField(TEXT("group"), Workflow->Group);
 		Object->SetStringField(TEXT("description"), Workflow->Description.ToString());
 		Object->SetBoolField(TEXT("uses_credits"), Workflow->bUsesPartnerNodes);
 
@@ -109,6 +110,10 @@ namespace ComfyToolsetPrivate
 			TSharedRef<FJsonObject> Entry = MakeShared<FJsonObject>();
 			Entry->SetStringField(TEXT("name"), Output.Name);
 			Entry->SetStringField(TEXT("kind"), StaticEnum<EComfyOutputKind>()->GetNameStringByValue(int64(Output.Kind)));
+			if (!Output.Slot.IsEmpty())
+			{
+				Entry->SetStringField(TEXT("slot"), Output.Slot);
+			}
 			Outputs.Add(MakeShared<FJsonValueObject>(Entry));
 		}
 		Object->SetArrayField(TEXT("outputs"), Outputs);
@@ -311,7 +316,7 @@ FString UComfyToolset::ListWorkflows(const FString& CategoryFilter)
 	TArray<TSharedPtr<FJsonValue>> Items;
 	for (const UComfyWorkflow* Workflow : UComfyEditorLibrary::GetAllWorkflows())
 	{
-		if (CategoryFilter.IsEmpty() || Workflow->Category.Equals(CategoryFilter, ESearchCase::IgnoreCase))
+		if (CategoryFilter.IsEmpty() || ComfyTypes::NormalizeCategory(Workflow->Category).Equals(ComfyTypes::NormalizeCategory(CategoryFilter), ESearchCase::IgnoreCase))
 		{
 			Items.Add(MakeShared<FJsonValueObject>(WorkflowJson(Workflow, false)));
 		}
@@ -458,7 +463,7 @@ UToolCallAsyncResultString* UComfyToolset::GenerateMaterial(const FString& Promp
 	{
 		for (UComfyWorkflow* Candidate : UComfyEditorLibrary::GetAllWorkflows())
 		{
-			if (Candidate->Category.Equals(TEXT("Textures"), ESearchCase::IgnoreCase))
+			if (ComfyTypes::NormalizeCategory(Candidate->Category).Equals(TEXT("Texture"), ESearchCase::IgnoreCase))
 			{
 				Found = Candidate;
 				break;

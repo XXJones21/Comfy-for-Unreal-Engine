@@ -10,6 +10,7 @@
 #include "Policies/CondensedJsonPrintPolicy.h"
 #include "Misc/SecureHash.h"
 #include "Math/UnrealMathUtility.h"
+#include "UObject/Package.h"
 
 namespace ComfyWorkflowPrivate
 {
@@ -166,6 +167,44 @@ namespace ComfyWorkflowPrivate
 		return false;
 	}
 
+	/** Map a manifest output kind and texture slot (docs/MANIFEST.md) to an output kind and an import rule. */
+	static void ReadOutputKind(const FString& Kind, const FString& Slot, EComfyOutputKind& OutKind, EComfyImportRule& OutRule)
+	{
+		static const TCHAR* LinearSlots[] = { TEXT("Roughness"), TEXT("Metallic"), TEXT("AO"), TEXT("Height"), TEXT("ORM"), TEXT("Opacity") };
+		if (Kind.Equals(TEXT("Texture"), ESearchCase::IgnoreCase) || Kind.Equals(TEXT("Image"), ESearchCase::IgnoreCase))
+		{
+			OutKind = EComfyOutputKind::Image;
+			OutRule = EComfyImportRule::Texture;
+			if (Slot.Equals(TEXT("Normal"), ESearchCase::IgnoreCase))
+			{
+				OutRule = EComfyImportRule::NormalMap;
+			}
+			for (const TCHAR* Linear : LinearSlots)
+			{
+				if (Slot.Equals(Linear, ESearchCase::IgnoreCase))
+				{
+					OutRule = EComfyImportRule::Masks;
+				}
+			}
+		}
+		else if (Kind.Equals(TEXT("Sound"), ESearchCase::IgnoreCase) || Kind.Equals(TEXT("Music"), ESearchCase::IgnoreCase) || Kind.Equals(TEXT("Audio"), ESearchCase::IgnoreCase))
+		{
+			OutKind = EComfyOutputKind::Audio;
+			OutRule = EComfyImportRule::Sound;
+		}
+		else if (Kind.Equals(TEXT("Mesh"), ESearchCase::IgnoreCase))
+		{
+			OutKind = EComfyOutputKind::Mesh;
+			OutRule = EComfyImportRule::StaticMesh;
+		}
+		else
+		{
+			const int64 Value = StaticEnum<EComfyOutputKind>()->GetValueByNameString(Kind, EGetByNameFlags::None);
+			OutKind = Value == INDEX_NONE ? EComfyOutputKind::File : EComfyOutputKind(Value);
+			OutRule = EComfyImportRule::Auto;
+		}
+	}
+
 	static bool IsSaveNode(const FString& ClassType, EComfyOutputKind& OutKind)
 	{
 		if (!ClassType.StartsWith(TEXT("Save")) && ClassType != TEXT("PreviewImage") && ClassType != TEXT("PreviewAudio") && ClassType != TEXT("Preview3D"))
@@ -216,8 +255,9 @@ bool UComfyWorkflow::SetGraphFromJson(const FString& Json, bool bDetectInterface
 	const TSharedPtr<FJsonObject>* Wrapped = nullptr;
 	if (Root->TryGetObjectField(TEXT("prompt"), Wrapped) && Wrapped)
 	{
+		// The plugin's bundles say "comfy_unreal"; the Comfy for Unreal extension's library says "manifest".
 		const TSharedPtr<FJsonObject>* ManifestObject = nullptr;
-		if (Root->TryGetObjectField(TEXT("comfy_unreal"), ManifestObject) && ManifestObject)
+		if ((Root->TryGetObjectField(TEXT("comfy_unreal"), ManifestObject) || Root->TryGetObjectField(TEXT("manifest"), ManifestObject)) && ManifestObject)
 		{
 			Manifest = *ManifestObject;
 		}
@@ -260,12 +300,12 @@ bool UComfyWorkflow::SetGraphFromJson(const FString& Json, bool bDetectInterface
 	}
 	if (Manifest.IsValid())
 	{
-		ApplyManifest(Manifest);
+		ApplyManifestObject(Manifest);
 	}
 	return true;
 }
 
-void UComfyWorkflow::ApplyManifest(const TSharedPtr<FJsonObject>& Manifest)
+void UComfyWorkflow::ApplyManifestObject(const TSharedPtr<FJsonObject>& Manifest)
 {
 	FString Text;
 	if (Manifest->TryGetStringField(TEXT("display_name"), Text))
@@ -276,7 +316,11 @@ void UComfyWorkflow::ApplyManifest(const TSharedPtr<FJsonObject>& Manifest)
 	{
 		Description = FText::FromString(Text);
 	}
-	Manifest->TryGetStringField(TEXT("category"), Category);
+	if (Manifest->TryGetStringField(TEXT("category"), Text))
+	{
+		Category = ComfyTypes::NormalizeCategory(Text);
+	}
+	Manifest->TryGetStringField(TEXT("group"), Group);
 
 	auto ParseEnum = [](const UEnum* Enum, const FString& Name, int64 Fallback)
 	{
@@ -312,6 +356,7 @@ void UComfyWorkflow::ApplyManifest(const TSharedPtr<FJsonObject>& Manifest)
 			Entry->TryGetStringArrayField(TEXT("options"), Input.Options);
 			Entry->TryGetStringArrayField(TEXT("prefer"), Input.Prefer);
 			Entry->TryGetStringField(TEXT("family"), Input.Family);
+			Entry->TryGetStringField(TEXT("source"), Input.Source);
 
 			// The default comes from the graph unless the manifest overrides it.
 			if (!Entry->TryGetStringField(TEXT("default"), Input.DefaultValue))
@@ -342,13 +387,14 @@ void UComfyWorkflow::ApplyManifest(const TSharedPtr<FJsonObject>& Manifest)
 			FComfyWorkflowOutput& Output = Outputs.AddDefaulted_GetRef();
 			Entry->TryGetStringField(TEXT("name"), Output.Name);
 			Entry->TryGetStringField(TEXT("node_id"), Output.NodeId);
+			Entry->TryGetStringField(TEXT("slot"), Output.Slot);
 			if (Entry->TryGetStringField(TEXT("kind"), Text))
 			{
-				Output.Kind = EComfyOutputKind(ParseEnum(StaticEnum<EComfyOutputKind>(), Text, int64(EComfyOutputKind::Image)));
+				ComfyWorkflowPrivate::ReadOutputKind(Text, Output.Slot, Output.Kind, Output.ImportRule);
 			}
 			if (Entry->TryGetStringField(TEXT("import"), Text))
 			{
-				Output.ImportRule = EComfyImportRule(ParseEnum(StaticEnum<EComfyImportRule>(), Text, int64(EComfyImportRule::Auto)));
+				Output.ImportRule = EComfyImportRule(ParseEnum(StaticEnum<EComfyImportRule>(), Text, int64(Output.ImportRule)));
 			}
 		}
 	}
@@ -645,6 +691,22 @@ TSharedPtr<FJsonObject> UComfyWorkflow::BuildGraph(const TMap<FString, FString>&
 		}
 	}
 	return Graph;
+}
+
+bool UComfyWorkflow::ApplyManifestFromCanvas(const FString& CanvasJson)
+{
+	TSharedPtr<FJsonObject> Root;
+	const TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(CanvasJson);
+	const TSharedPtr<FJsonObject>* Extra = nullptr;
+	const TSharedPtr<FJsonObject>* Manifest = nullptr;
+	if (!FJsonSerializer::Deserialize(Reader, Root) || !Root.IsValid()
+		|| !Root->TryGetObjectField(TEXT("extra"), Extra) || !Extra || !(*Extra)->TryGetObjectField(TEXT("comfy_unreal"), Manifest) || !Manifest)
+	{
+		return false;
+	}
+	Modify();
+	ApplyManifestObject(*Manifest);
+	return true;
 }
 
 FString UComfyWorkflow::GetNodeClass(const FString& NodeId) const

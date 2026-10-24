@@ -71,6 +71,15 @@ namespace ComfyTypes
 		return State == EComfyJobState::Succeeded || State == EComfyJobState::Failed || State == EComfyJobState::Canceled;
 	}
 
+	FString NormalizeCategory(const FString& Category)
+	{
+		if (Category.Equals(TEXT("Textures"), ESearchCase::IgnoreCase)) return TEXT("Texture");
+		if (Category.Equals(TEXT("Audio"), ESearchCase::IgnoreCase)) return TEXT("Sound");
+		if (Category.Equals(TEXT("Meshes"), ESearchCase::IgnoreCase)) return TEXT("Mesh");
+		if (Category.Equals(TEXT("Materials"), ESearchCase::IgnoreCase)) return TEXT("Material");
+		return Category;
+	}
+
 	FString PickModel(const TArray<FString>& Options, const TArray<FString>& Prefer, const FString& Fallback)
 	{
 		for (const FString& Wanted : Prefer)

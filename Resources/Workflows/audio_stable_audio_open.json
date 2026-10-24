@@ -1,7 +1,8 @@
 {
   "comfy_unreal": {
+    "version": 1,
     "display_name": "Sound Effect (Stable Audio Open)",
-    "category": "Audio",
+    "category": "Sound",
     "description": "A sound effect, ambience or short music loop from a text prompt, up to 47 seconds, saved as FLAC and imported as a Sound Wave. Stock ComfyUI nodes. Needs stable-audio-open-1.0.safetensors in models/checkpoints and t5-base.safetensors in models/text_encoders.",
     "inputs": [
       {

@@ -1,7 +1,8 @@
 {
   "comfy_unreal": {
+    "version": 1,
     "display_name": "Seamless Texture (Flux Dev GGUF)",
-    "category": "Textures",
+    "category": "Texture",
     "description": "Higher-quality surface texture with Flux Dev in a quantized GGUF, for 12-16 GB GPUs. Needs the ComfyUI-GGUF custom nodes, a flux1-dev GGUF in models/unet, clip_l and t5xxl_fp8_e4m3fn in models/clip (or text_encoders), and the Flux VAE (ae.safetensors) in models/vae.",
     "inputs": [
       {
@@ -100,8 +101,8 @@
       {
         "name": "albedo",
         "node_id": "9",
-        "kind": "Image",
-        "import": "Texture"
+        "kind": "Texture",
+        "slot": "BaseColor"
       }
     ]
   },

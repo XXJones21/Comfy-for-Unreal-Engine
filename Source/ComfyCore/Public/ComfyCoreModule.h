@@ -2,6 +2,7 @@
 
 #pragma once
 
+#include "CoreMinimal.h"
 #include "Modules/ModuleInterface.h"
 
 COMFYCORE_API DECLARE_LOG_CATEGORY_EXTERN(LogComfy, Log, All);

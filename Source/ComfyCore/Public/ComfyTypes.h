@@ -5,6 +5,8 @@
 #include "CoreMinimal.h"
 #include "ComfyTypes.generated.h"
 
+class FJsonObject;
+
 /** Which kind of service a backend profile points at. */
 UENUM(BlueprintType)
 enum class EComfyBackendKind : uint8
@@ -168,6 +170,10 @@ struct COMFYCORE_API FComfyWorkflowInput
 	/** Model inputs: what kind of model fits, for people and agents (for example "flux-vae"). */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Comfy")
 	FString Family;
+
+	/** Where Unreal fills it from: Constant (the form), Prompt, SelectedTextures, SelectedMeshes or ViewportCapture. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Comfy")
+	FString Source;
 };
 
 /** One workflow output and how it lands in Unreal. */
@@ -189,6 +195,10 @@ struct COMFYCORE_API FComfyWorkflowOutput
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Comfy")
 	EComfyImportRule ImportRule = EComfyImportRule::Auto;
+
+	/** For textures: the material slot it fills (BaseColor, Normal, Roughness, Metallic, AO, Height, ORM, Emissive, Opacity). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Comfy")
+	FString Slot;
 };
 
 /** A file a job produced, downloaded to this machine. */
@@ -272,8 +282,10 @@ namespace ComfyTypes
 	COMFYCORE_API FString ContentTypeFromFileName(const FString& FileName);
 	COMFYCORE_API const TCHAR* StateToString(EComfyJobState State);
 	COMFYCORE_API bool IsTerminal(EComfyJobState State);
+	/** A workflow type from docs/MANIFEST.md, with older plural names (Textures, Audio, Meshes) mapped onto it. */
+	COMFYCORE_API FString NormalizeCategory(const FString& Category);
 	/** The first option matching Prefer (exact name, then substring, per entry); else Fallback if it's an option or there are none; else the first option. */
 	COMFYCORE_API FString PickModel(const TArray<FString>& Options, const TArray<FString>& Prefer, const FString& Fallback);
 	/** Fill InputOptions from an object_info response: every input whose spec is a list of strings. */
-	COMFYCORE_API void ReadInputOptions(const TSharedPtr<class FJsonObject>& ObjectInfo, TMap<FString, TArray<FString>>& OutOptions);
+	COMFYCORE_API void ReadInputOptions(const TSharedPtr<FJsonObject>& ObjectInfo, TMap<FString, TArray<FString>>& OutOptions);
 }
