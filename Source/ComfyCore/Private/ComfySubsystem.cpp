@@ -105,6 +105,12 @@ FString UComfySubsystem::ResolveApiKey(const FComfyBackendProfile& Profile) cons
 			return FromEnv;
 		}
 	}
+	// comfy-cli's workspace key, so a machine set up for `comfy build` / `comfy deploy` works as is.
+	const FString FromCli = FPlatformMisc::GetEnvironmentVariable(TEXT("COMFY_CLOUD_API_KEY"));
+	if (!FromCli.IsEmpty())
+	{
+		return FromCli;
+	}
 	if (!SessionApiKey.IsEmpty())
 	{
 		return SessionApiKey;
