@@ -54,6 +54,10 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Graph")
 	FString SourceFile;
 
+	/** The canvas (UI) save of the graph when it came from the ComfyUI frontend, so the Graph view can reopen it with layout. */
+	UPROPERTY(VisibleAnywhere, Category = "Graph", AdvancedDisplay, meta = (MultiLine = true))
+	FString UiGraphJson;
+
 	/** The API-format graph, verbatim. Re-import the JSON to change it; don't edit by hand. */
 	UPROPERTY(VisibleAnywhere, Category = "Graph", AdvancedDisplay, meta = (MultiLine = true))
 	FString ApiGraphJson;

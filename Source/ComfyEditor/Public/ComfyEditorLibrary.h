@@ -105,6 +105,14 @@ public:
 	/** Package-safe asset name from free text. */
 	static FString MakeAssetName(const FString& Prefix, const FString& Text);
 
+	/**
+	 * Save a graph from the ComfyUI frontend as a workflow asset in /Game/Comfy/Workflows, or update the one with that name.
+	 * WorkflowJson is the canvas save (kept for reopening, and its extra.linearData picks the inputs when App mode set them);
+	 * ApiJson is the API-format prompt that runs. Inputs are detected from the graph otherwise.
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Comfy|Editor")
+	static UComfyWorkflow* SaveGraphAsWorkflow(const FString& WorkflowJson, const FString& ApiJson, const FString& Name, FString& OutError);
+
 	/** Open the Comfy Studio tab, or bring it to the front. View is "Run" or "Graph"; empty keeps the current one. */
 	UFUNCTION(BlueprintCallable, Category = "Comfy|Editor")
 	static bool OpenStudio(const FString& View);

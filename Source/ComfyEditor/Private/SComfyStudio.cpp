@@ -1,6 +1,9 @@
 // Copyright Comfy Org. All Rights Reserved.
 
 #include "SComfyStudio.h"
+#include "SComfyGraph.h"
+#include "Widgets/Input/SSegmentedControl.h"
+#include "Widgets/Layout/SWidgetSwitcher.h"
 #include "ComfyEditorLibrary.h"
 #include "ComfyJob.h"
 #include "ComfySettings.h"
@@ -64,6 +67,13 @@ void SComfyStudio::SetActiveView(const FString& View)
 
 void SComfyStudio::ShowView(const FString& View)
 {
+	const bool bGraph = View.Equals(TEXT("Graph"), ESearchCase::IgnoreCase);
+	ViewSwitcher->SetActiveWidgetIndex(bGraph ? 1 : 0);
+	if (bGraph)
+	{
+		// The browser starts on first use, so opening Comfy Studio stays cheap.
+		Graph->Activate();
+	}
 }
 
 void SComfyStudio::Construct(const FArguments& InArgs)
@@ -83,6 +93,9 @@ void SComfyStudio::Construct(const FArguments& InArgs)
 			]
 			+ SVerticalBox::Slot().FillHeight(1.f)
 			[
+				SAssignNew(ViewSwitcher, SWidgetSwitcher)
+				+ SWidgetSwitcher::Slot()
+				[
 				SNew(SSplitter)
 				.Orientation(Orient_Vertical)
 				+ SSplitter::Slot().Value(0.68f)
@@ -101,6 +114,13 @@ void SComfyStudio::Construct(const FArguments& InArgs)
 				[
 					BuildJobList()
 				]
+				]
+				+ SWidgetSwitcher::Slot()
+				[
+					SAssignNew(Graph, SComfyGraph)
+					.SelectedWorkflow_Lambda([this]() { return GetSelectedWorkflow(); })
+					.OnWorkflowSaved_Lambda([this]() { RefreshWorkflows(); })
+				]
 			]
 		]
 	];
@@ -109,7 +129,14 @@ void SComfyStudio::Construct(const FArguments& InArgs)
 	{
 		JobAddedHandle = Comfy->OnJobAdded.AddSPLambda(this, [this](UComfyJob*) { RefreshJobs(); });
 		StatusHandle = Comfy->OnBackendStatus.AddSPLambda(this, [this](const FComfyBackendStatus& Status) { HandleBackendStatus(Status); });
-		ActiveBackendHandle = Comfy->OnActiveBackendChanged.AddSP(this, &SComfyStudio::RefreshBackends);
+		ActiveBackendHandle = Comfy->OnActiveBackendChanged.AddSPLambda(this, [this]()
+		{
+			RefreshBackends();
+			if (ViewSwitcher->GetActiveWidgetIndex() == 1)
+			{
+				Graph->Activate();
+			}
+		});
 	}
 
 	RefreshBackends();
@@ -134,6 +161,14 @@ SComfyStudio::~SComfyStudio()
 TSharedRef<SWidget> SComfyStudio::BuildBackendBar()
 {
 	return SNew(SHorizontalBox)
+		+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0, 0, 12, 0)
+		[
+			SNew(SSegmentedControl<int32>)
+			.Value_Lambda([this]() { return ViewSwitcher.IsValid() ? ViewSwitcher->GetActiveWidgetIndex() : 0; })
+			.OnValueChanged_Lambda([this](int32 Index) { ShowView(Index == 1 ? TEXT("Graph") : TEXT("Run")); })
+			+ SSegmentedControl<int32>::Slot(0).Text(LOCTEXT("RunView", "Run")).ToolTip(LOCTEXT("RunViewTooltip", "Pick a workflow, fill in its inputs and run it."))
+			+ SSegmentedControl<int32>::Slot(1).Text(LOCTEXT("GraphView", "Graph")).ToolTip(LOCTEXT("GraphViewTooltip", "Edit graphs in ComfyUI on the active backend, and send them to Unreal."))
+		]
 		+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0, 0, 6, 0)
 		[
 			SNew(STextBlock).Text(LOCTEXT("Backend", "Backend"))

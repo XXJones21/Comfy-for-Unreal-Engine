@@ -34,6 +34,7 @@ public class ComfyEditor : ModuleRules
 			"Slate",
 			"SlateCore",
 			"ToolMenus",
+			"WebBrowser",
 			"WorkspaceMenuStructure",
 		});
 	}

@@ -34,6 +34,10 @@
 #include "Materials/MaterialInstanceConstant.h"
 #include "Misc/FileHelper.h"
 #include "Misc/Paths.h"
+#include "Serialization/JsonReader.h"
+#include "Serialization/JsonSerializer.h"
+#include "Dom/JsonObject.h"
+#include "Dom/JsonValue.h"
 #include "ScopedTransaction.h"
 #include "UObject/Package.h"
 
@@ -575,6 +579,123 @@ UComfyProvenanceUserData* UComfyEditorLibrary::GetProvenance(UObject* Asset)
 {
 	IInterface_AssetUserData* Owner = Cast<IInterface_AssetUserData>(Asset);
 	return Owner ? Cast<UComfyProvenanceUserData>(Owner->GetAssetUserDataOfClass(UComfyProvenanceUserData::StaticClass())) : nullptr;
+}
+
+namespace ComfyEditorPrivate
+{
+	/** The [node id, input name] pairs App mode exposed, from a canvas save's extra.linearData. Empty when absent or unreadable. */
+	static TArray<TPair<FString, FString>> ReadLinearInputs(const FString& WorkflowJson)
+	{
+		TArray<TPair<FString, FString>> Pairs;
+		TSharedPtr<FJsonObject> Root;
+		const TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(WorkflowJson);
+		const TSharedPtr<FJsonObject>* Extra = nullptr;
+		const TSharedPtr<FJsonObject>* Linear = nullptr;
+		const TArray<TSharedPtr<FJsonValue>>* Inputs = nullptr;
+		if (!FJsonSerializer::Deserialize(Reader, Root) || !Root.IsValid()
+			|| !Root->TryGetObjectField(TEXT("extra"), Extra) || !(*Extra)->TryGetObjectField(TEXT("linearData"), Linear)
+			|| !(*Linear)->TryGetArrayField(TEXT("inputs"), Inputs))
+		{
+			return Pairs;
+		}
+		// Accept [node, input] pairs or {nodeId, widgetName}-style objects, since the format is young.
+		for (const TSharedPtr<FJsonValue>& Item : *Inputs)
+		{
+			const TArray<TSharedPtr<FJsonValue>>* Pair = nullptr;
+			const TSharedPtr<FJsonObject>* Object = nullptr;
+			FString Node, Input;
+			if (Item->TryGetArray(Pair) && Pair->Num() >= 2)
+			{
+				Node = (*Pair)[0]->Type == EJson::Number ? FString::FromInt(int32((*Pair)[0]->AsNumber())) : (*Pair)[0]->AsString();
+				Input = (*Pair)[1]->AsString();
+			}
+			else if (Item->TryGetObject(Object))
+			{
+				for (const TCHAR* Key : { TEXT("nodeId"), TEXT("node_id"), TEXT("node") })
+				{
+					double Number = 0;
+					if ((*Object)->TryGetStringField(Key, Node))
+					{
+						break;
+					}
+					if ((*Object)->TryGetNumberField(Key, Number))
+					{
+						Node = FString::FromInt(int32(Number));
+						break;
+					}
+				}
+				for (const TCHAR* Key : { TEXT("widgetName"), TEXT("name"), TEXT("input") })
+				{
+					if ((*Object)->TryGetStringField(Key, Input))
+					{
+						break;
+					}
+				}
+			}
+			if (!Node.IsEmpty() && !Input.IsEmpty())
+			{
+				Pairs.Emplace(Node, Input);
+			}
+		}
+		return Pairs;
+	}
+}
+
+UComfyWorkflow* UComfyEditorLibrary::SaveGraphAsWorkflow(const FString& WorkflowJson, const FString& ApiJson, const FString& Name, FString& OutError)
+{
+	const FString Folder = TEXT("/Game/Comfy/Workflows");
+	const FString AssetName = MakeAssetName(TEXT("CW_"), FPaths::GetBaseFilename(Name.IsEmpty() ? FString(TEXT("Graph")) : Name));
+	const FString PackageName = Folder / AssetName;
+
+	UComfyWorkflow* Workflow = LoadObject<UComfyWorkflow>(nullptr, *(PackageName + TEXT(".") + AssetName), nullptr, LOAD_NoWarn | LOAD_Quiet);
+	const bool bExisting = Workflow != nullptr;
+	if (!Workflow)
+	{
+		UPackage* Package = CreatePackage(*PackageName);
+		Workflow = NewObject<UComfyWorkflow>(Package, FName(*AssetName), RF_Public | RF_Standalone | RF_Transactional);
+	}
+	if (!Workflow->SetGraphFromJson(ApiJson, !bExisting, OutError))
+	{
+		return nullptr;
+	}
+	if (bExisting && Workflow->Inputs.Num() == 0)
+	{
+		Workflow->DetectInterface();
+	}
+	Workflow->UiGraphJson = WorkflowJson;
+	if (Workflow->DisplayName.IsEmpty())
+	{
+		Workflow->DisplayName = FText::FromString(FPaths::GetBaseFilename(Name.IsEmpty() ? FString(TEXT("Graph")) : Name));
+	}
+
+	// App mode's chosen inputs replace the detected ones; anything it names that detection missed is added as text.
+	const TArray<TPair<FString, FString>> Linear = ComfyEditorPrivate::ReadLinearInputs(WorkflowJson);
+	if (Linear.Num() > 0)
+	{
+		TArray<FComfyWorkflowInput> Chosen;
+		for (const TPair<FString, FString>& Pair : Linear)
+		{
+			const FComfyWorkflowInput* Detected = Workflow->Inputs.FindByPredicate([&Pair](const FComfyWorkflowInput& Input) { return Input.NodeId == Pair.Key && Input.InputName == Pair.Value; });
+			FComfyWorkflowInput Input = Detected ? *Detected : FComfyWorkflowInput();
+			if (!Detected)
+			{
+				Input.NodeId = Pair.Key;
+				Input.InputName = Pair.Value;
+				Input.Name = FString::Printf(TEXT("%s_%s"), *Pair.Value, *Pair.Key);
+				Input.Label = Pair.Value;
+			}
+			Chosen.Add(Input);
+		}
+		Workflow->Inputs = Chosen;
+	}
+
+	if (!bExisting)
+	{
+		FAssetRegistryModule::AssetCreated(Workflow);
+	}
+	Workflow->MarkPackageDirty();
+	ComfyEditorPrivate::SavePackagesOf({ Workflow });
+	return Workflow;
 }
 
 bool UComfyEditorLibrary::OpenStudio(const FString& View)

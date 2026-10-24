@@ -9,7 +9,9 @@
 
 class UComfyJob;
 class UComfyWorkflow;
+class SComfyGraph;
 class SVerticalBox;
+class SWidgetSwitcher;
 template <typename OptionType> class SComboBox;
 
 /**
@@ -92,6 +94,9 @@ private:
 	TSharedPtr<SListView<TSharedPtr<FJobItem>>> JobList;
 
 	void ShowView(const FString& View);
+
+	TSharedPtr<SWidgetSwitcher> ViewSwitcher;
+	TSharedPtr<SComfyGraph> Graph;
 
 	/** The open panel, for SetActiveView. Comfy Studio is a single nomad tab. */
 	static TWeakPtr<SComfyStudio> Instance;
