@@ -121,6 +121,8 @@ enum class EComfyInputType : uint8
 	File,
 	/** A choice from a list (for example a checkpoint name). */
 	Enum,
+	/** A model file the loader node reads. Choices come from the connected backend; Prefer picks the default. */
+	Model,
 };
 
 /** One workflow input that people, Blueprints and agents may set. */
@@ -158,6 +160,14 @@ struct COMFYCORE_API FComfyWorkflowInput
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Comfy")
 	FString Tooltip;
+
+	/** Model inputs: names to prefer among the backend's files, in order. Each is tried as an exact filename, then as a substring. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Comfy")
+	TArray<FString> Prefer;
+
+	/** Model inputs: what kind of model fits, for people and agents (for example "flux-vae"). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Comfy")
+	FString Family;
 };
 
 /** One workflow output and how it lands in Unreal. */
@@ -251,6 +261,9 @@ struct COMFYCORE_API FComfyBackendStatus
 
 	/** Node classes the backend reports (native backends only; empty when unknown). */
 	TSet<FString> NodeClasses;
+
+	/** Choices for list inputs, keyed "NodeClass.input", from the backend's object_info. Empty when unknown. */
+	TMap<FString, TArray<FString>> InputOptions;
 };
 
 namespace ComfyTypes
@@ -259,4 +272,8 @@ namespace ComfyTypes
 	COMFYCORE_API FString ContentTypeFromFileName(const FString& FileName);
 	COMFYCORE_API const TCHAR* StateToString(EComfyJobState State);
 	COMFYCORE_API bool IsTerminal(EComfyJobState State);
+	/** The first option matching Prefer (exact name, then substring, per entry); else Fallback if it's an option or there are none; else the first option. */
+	COMFYCORE_API FString PickModel(const TArray<FString>& Options, const TArray<FString>& Prefer, const FString& Fallback);
+	/** Fill InputOptions from an object_info response: every input whose spec is a list of strings. */
+	COMFYCORE_API void ReadInputOptions(const TSharedPtr<class FJsonObject>& ObjectInfo, TMap<FString, TArray<FString>>& OutOptions);
 }

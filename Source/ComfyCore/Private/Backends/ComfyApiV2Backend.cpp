@@ -33,18 +33,31 @@ void FComfyApiV2Backend::Probe(TFunction<void(const FComfyBackendStatus&)> Callb
 	// 404 means the key was accepted, 401 means it wasn't.
 	const FString Url = Profile.BaseUrl + TEXT("/api/v2/assets/00000000-0000-0000-0000-000000000000");
 	const FString Base = Profile.BaseUrl;
-	ComfyHttp::Send(TEXT("GET"), Url, AuthHeaders(), [Status, Base, Callback](const ComfyHttp::FResponse& Response) mutable
+	const ComfyHttp::FHeaders Auth = AuthHeaders();
+	ComfyHttp::Send(TEXT("GET"), Url, Auth, [Status, Base, Auth, Callback](const ComfyHttp::FResponse& Response) mutable
 	{
-		if (Response.bConnected && (Response.Code == 404 || Response.IsOk()))
-		{
-			Status.bReachable = true;
-			Status.Summary = FString::Printf(TEXT("Comfy API v2 at %s, key accepted"), *Base);
-		}
-		else
+		if (!Response.bConnected || (Response.Code != 404 && !Response.IsOk()))
 		{
 			Status.Summary = Response.Describe(FString::Printf(TEXT("Comfy API v2 at %s"), *Base));
+			Callback(Status);
+			return;
 		}
-		Callback(Status);
+		Status.bReachable = true;
+		Status.Summary = FString::Printf(TEXT("Comfy API v2 at %s, key accepted"), *Base);
+		// Comfy Cloud also serves ComfyUI's node catalog here, which gives model choices. Optional: skip if absent.
+		ComfyHttp::Send(TEXT("GET"), Base + TEXT("/api/object_info"), Auth, [Status, Callback](const ComfyHttp::FResponse& Info) mutable
+		{
+			if (Info.IsOk() && Info.Json.IsValid())
+			{
+				for (const TPair<FString, TSharedPtr<FJsonValue>>& Pair : Info.Json->Values)
+				{
+					Status.NodeClasses.Add(Pair.Key);
+				}
+				ComfyTypes::ReadInputOptions(Info.Json, Status.InputOptions);
+				Status.Summary += FString::Printf(TEXT(", %d node types"), Status.NodeClasses.Num());
+			}
+			Callback(Status);
+		}, 120.f);
 	}, 15.f);
 }
 

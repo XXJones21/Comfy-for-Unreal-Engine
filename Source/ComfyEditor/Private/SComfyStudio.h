@@ -42,6 +42,7 @@ private:
 	TSharedRef<SWidget> BuildBackendBar();
 	void RefreshBackends();
 	void CheckActiveBackend();
+	void HandleBackendStatus(const FComfyBackendStatus& Status);
 	FText GetStatusText() const;
 	FSlateColor GetStatusColor() const;
 

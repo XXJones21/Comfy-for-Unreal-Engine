@@ -310,6 +310,8 @@ void UComfyWorkflow::ApplyManifest(const TSharedPtr<FJsonObject>& Manifest)
 				Input.Type = EComfyInputType(ParseEnum(StaticEnum<EComfyInputType>(), Text, int64(EComfyInputType::String)));
 			}
 			Entry->TryGetStringArrayField(TEXT("options"), Input.Options);
+			Entry->TryGetStringArrayField(TEXT("prefer"), Input.Prefer);
+			Entry->TryGetStringField(TEXT("family"), Input.Family);
 
 			// The default comes from the graph unless the manifest overrides it.
 			if (!Entry->TryGetStringField(TEXT("default"), Input.DefaultValue))
@@ -531,6 +533,10 @@ FString UComfyWorkflow::GetInputSchemaJson() const
 		{
 			PropDescription += TEXT(". A whole number, or \"random\" for a new seed on every run.");
 		}
+		if (Input.Type == EComfyInputType::Model)
+		{
+			PropDescription += Input.Family.IsEmpty() ? FString(TEXT(". A model file on the backend.")) : FString::Printf(TEXT(". A %s model file on the backend."), *Input.Family);
+		}
 		Prop->SetStringField(TEXT("description"), PropDescription);
 		// Seeds are sent as text so "random" fits the schema; agent runs get a random seed when they leave it out.
 		Prop->SetStringField(TEXT("default"), Input.Type == EComfyInputType::Seed ? FString(TEXT("random")) : Input.DefaultValue);
@@ -639,6 +645,19 @@ TSharedPtr<FJsonObject> UComfyWorkflow::BuildGraph(const TMap<FString, FString>&
 		}
 	}
 	return Graph;
+}
+
+FString UComfyWorkflow::GetNodeClass(const FString& NodeId) const
+{
+	FString Error;
+	const TSharedPtr<FJsonObject> Graph = ParseGraph(Error);
+	const TSharedPtr<FJsonObject>* Node = nullptr;
+	FString ClassType;
+	if (Graph.IsValid() && Graph->TryGetObjectField(NodeId, Node) && Node)
+	{
+		(*Node)->TryGetStringField(TEXT("class_type"), ClassType);
+	}
+	return ClassType;
 }
 
 const FComfyWorkflowOutput* UComfyWorkflow::FindOutputForNode(const FString& NodeId) const

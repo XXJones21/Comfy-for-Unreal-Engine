@@ -45,7 +45,12 @@
         "label": "Checkpoint",
         "node_id": "4",
         "input": "ckpt_name",
-        "type": "String"
+        "type": "Model",
+        "prefer": [
+          "flux1-schnell-fp8",
+          "flux1-schnell"
+        ],
+        "family": "flux-schnell-checkpoint"
       }
     ],
     "outputs": [

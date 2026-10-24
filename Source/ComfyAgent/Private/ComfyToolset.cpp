@@ -115,7 +115,32 @@ namespace ComfyToolsetPrivate
 
 		if (bDetailed)
 		{
-			Object->SetField(TEXT("input_schema"), Parse(Workflow->GetInputSchemaJson()));
+			const TSharedPtr<FJsonValue> Schema = Parse(Workflow->GetInputSchemaJson());
+			const TSharedPtr<FJsonObject> SchemaObject = Schema->Type == EJson::Object ? Schema->AsObject() : nullptr;
+			const TSharedPtr<FJsonObject>* Properties = nullptr;
+			if (SchemaObject.IsValid() && SchemaObject->TryGetObjectField(TEXT("properties"), Properties) && Properties)
+			{
+				// Model files depend on the backend, so list what the active one has and the pick it would make.
+				for (const FComfyWorkflowInput& Input : Workflow->Inputs)
+				{
+					const TSharedPtr<FJsonObject>* Prop = nullptr;
+					if (Input.Type != EComfyInputType::Model || !(*Properties)->TryGetObjectField(Input.Name, Prop) || !Prop)
+					{
+						continue;
+					}
+					TArray<TSharedPtr<FJsonValue>> Enum;
+					for (const FString& Option : Comfy()->GetInputOptions(NAME_None, Workflow, Input.Name))
+					{
+						Enum.Add(MakeShared<FJsonValueString>(Option));
+					}
+					if (Enum.Num() > 0)
+					{
+						(*Prop)->SetArrayField(TEXT("enum"), Enum);
+					}
+					(*Prop)->SetStringField(TEXT("default"), Comfy()->GetDefaultInputValue(NAME_None, Workflow, Input.Name));
+				}
+			}
+			Object->SetField(TEXT("input_schema"), Schema);
 			TArray<TSharedPtr<FJsonValue>> Missing;
 			for (const FString& Node : Comfy()->GetMissingNodeClasses(NAME_None, Workflow))
 			{

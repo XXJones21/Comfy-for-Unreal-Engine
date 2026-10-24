@@ -4,25 +4,202 @@
     "category": "Meshes",
     "description": "An untextured 3D mesh from one reference image, saved as GLB and imported as a Static Mesh. Stock ComfyUI nodes. Needs hunyuan3d-dit-v2.safetensors in models/checkpoints and about 12 GB of VRAM. Use a centered object on a plain background.",
     "inputs": [
-      { "name": "image", "label": "Reference image", "node_id": "56", "input": "image", "type": "File", "tooltip": "A PNG or JPG of one object on a plain background" },
-      { "name": "seed", "label": "Seed", "node_id": "3", "input": "seed", "type": "Seed" },
-      { "name": "steps", "label": "Steps", "node_id": "3", "input": "steps", "type": "Int" },
-      { "name": "octree_resolution", "label": "Detail", "node_id": "61", "input": "octree_resolution", "type": "Int", "tooltip": "Mesh resolution: 256 is fast, 384 or 512 is finer and slower" }
+      {
+        "name": "image",
+        "label": "Reference image",
+        "node_id": "56",
+        "input": "image",
+        "type": "File",
+        "tooltip": "A PNG or JPG of one object on a plain background"
+      },
+      {
+        "name": "seed",
+        "label": "Seed",
+        "node_id": "3",
+        "input": "seed",
+        "type": "Seed"
+      },
+      {
+        "name": "steps",
+        "label": "Steps",
+        "node_id": "3",
+        "input": "steps",
+        "type": "Int"
+      },
+      {
+        "name": "octree_resolution",
+        "label": "Detail",
+        "node_id": "61",
+        "input": "octree_resolution",
+        "type": "Int",
+        "tooltip": "Mesh resolution: 256 is fast, 384 or 512 is finer and slower"
+      },
+      {
+        "name": "ckpt_name",
+        "label": "Checkpoint",
+        "node_id": "54",
+        "input": "ckpt_name",
+        "type": "Model",
+        "prefer": [
+          "hunyuan3d-dit-v2",
+          "hunyuan3d"
+        ],
+        "family": "hunyuan3d-2"
+      }
     ],
     "outputs": [
-      { "name": "mesh", "node_id": "67", "kind": "Mesh", "import": "StaticMesh" }
+      {
+        "name": "mesh",
+        "node_id": "67",
+        "kind": "Mesh",
+        "import": "StaticMesh"
+      }
     ]
   },
   "prompt": {
-    "54": { "class_type": "ImageOnlyCheckpointLoader", "_meta": { "title": "Load Hunyuan3D" }, "inputs": { "ckpt_name": "hunyuan3d-dit-v2.safetensors" } },
-    "56": { "class_type": "LoadImage", "_meta": { "title": "Reference image" }, "inputs": { "image": "example.png" } },
-    "51": { "class_type": "CLIPVisionEncode", "_meta": { "title": "Encode image" }, "inputs": { "clip_vision": ["54", 1], "image": ["56", 0], "crop": "center" } },
-    "50": { "class_type": "Hunyuan3Dv2Conditioning", "_meta": { "title": "Conditioning" }, "inputs": { "clip_vision_output": ["51", 0] } },
-    "52": { "class_type": "EmptyLatentHunyuan3Dv2", "_meta": { "title": "Latent" }, "inputs": { "resolution": 3072, "batch_size": 1 } },
-    "70": { "class_type": "ModelSamplingAuraFlow", "_meta": { "title": "Shift" }, "inputs": { "shift": 1.0, "model": ["54", 0] } },
-    "3": { "class_type": "KSampler", "_meta": { "title": "KSampler" }, "inputs": { "seed": 0, "steps": 30, "cfg": 5.0, "sampler_name": "euler", "scheduler": "normal", "denoise": 1.0, "model": ["70", 0], "positive": ["50", 0], "negative": ["50", 1], "latent_image": ["52", 0] } },
-    "61": { "class_type": "VAEDecodeHunyuan3D", "_meta": { "title": "Decode volume" }, "inputs": { "samples": ["3", 0], "vae": ["54", 2], "num_chunks": 8000, "octree_resolution": 256 } },
-    "59": { "class_type": "VoxelToMeshBasic", "_meta": { "title": "Volume to mesh" }, "inputs": { "voxel": ["61", 0], "threshold": 0.6 } },
-    "67": { "class_type": "SaveGLB", "_meta": { "title": "Mesh" }, "inputs": { "mesh": ["59", 0], "filename_prefix": "unreal/mesh" } }
+    "54": {
+      "class_type": "ImageOnlyCheckpointLoader",
+      "_meta": {
+        "title": "Load Hunyuan3D"
+      },
+      "inputs": {
+        "ckpt_name": "hunyuan3d-dit-v2.safetensors"
+      }
+    },
+    "56": {
+      "class_type": "LoadImage",
+      "_meta": {
+        "title": "Reference image"
+      },
+      "inputs": {
+        "image": "example.png"
+      }
+    },
+    "51": {
+      "class_type": "CLIPVisionEncode",
+      "_meta": {
+        "title": "Encode image"
+      },
+      "inputs": {
+        "clip_vision": [
+          "54",
+          1
+        ],
+        "image": [
+          "56",
+          0
+        ],
+        "crop": "center"
+      }
+    },
+    "50": {
+      "class_type": "Hunyuan3Dv2Conditioning",
+      "_meta": {
+        "title": "Conditioning"
+      },
+      "inputs": {
+        "clip_vision_output": [
+          "51",
+          0
+        ]
+      }
+    },
+    "52": {
+      "class_type": "EmptyLatentHunyuan3Dv2",
+      "_meta": {
+        "title": "Latent"
+      },
+      "inputs": {
+        "resolution": 3072,
+        "batch_size": 1
+      }
+    },
+    "70": {
+      "class_type": "ModelSamplingAuraFlow",
+      "_meta": {
+        "title": "Shift"
+      },
+      "inputs": {
+        "shift": 1.0,
+        "model": [
+          "54",
+          0
+        ]
+      }
+    },
+    "3": {
+      "class_type": "KSampler",
+      "_meta": {
+        "title": "KSampler"
+      },
+      "inputs": {
+        "seed": 0,
+        "steps": 30,
+        "cfg": 5.0,
+        "sampler_name": "euler",
+        "scheduler": "normal",
+        "denoise": 1.0,
+        "model": [
+          "70",
+          0
+        ],
+        "positive": [
+          "50",
+          0
+        ],
+        "negative": [
+          "50",
+          1
+        ],
+        "latent_image": [
+          "52",
+          0
+        ]
+      }
+    },
+    "61": {
+      "class_type": "VAEDecodeHunyuan3D",
+      "_meta": {
+        "title": "Decode volume"
+      },
+      "inputs": {
+        "samples": [
+          "3",
+          0
+        ],
+        "vae": [
+          "54",
+          2
+        ],
+        "num_chunks": 8000,
+        "octree_resolution": 256
+      }
+    },
+    "59": {
+      "class_type": "VoxelToMeshBasic",
+      "_meta": {
+        "title": "Volume to mesh"
+      },
+      "inputs": {
+        "voxel": [
+          "61",
+          0
+        ],
+        "threshold": 0.6
+      }
+    },
+    "67": {
+      "class_type": "SaveGLB",
+      "_meta": {
+        "title": "Mesh"
+      },
+      "inputs": {
+        "mesh": [
+          "59",
+          0
+        ],
+        "filename_prefix": "unreal/mesh"
+      }
+    }
   }
 }

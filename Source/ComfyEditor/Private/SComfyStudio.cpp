@@ -108,7 +108,7 @@ void SComfyStudio::Construct(const FArguments& InArgs)
 	if (UComfySubsystem* Comfy = UComfySubsystem::Get())
 	{
 		JobAddedHandle = Comfy->OnJobAdded.AddSPLambda(this, [this](UComfyJob*) { RefreshJobs(); });
-		StatusHandle = Comfy->OnBackendStatus.AddSPLambda(this, [this](const FComfyBackendStatus&) { /* Status text is bound and refreshes itself. */ });
+		StatusHandle = Comfy->OnBackendStatus.AddSPLambda(this, [this](const FComfyBackendStatus& Status) { HandleBackendStatus(Status); });
 		ActiveBackendHandle = Comfy->OnActiveBackendChanged.AddSP(this, &SComfyStudio::RefreshBackends);
 	}
 
@@ -220,6 +220,31 @@ void SComfyStudio::RefreshBackends()
 		BackendCombo->RefreshOptions();
 		BackendCombo->SetSelectedItem(Active);
 	}
+}
+
+void SComfyStudio::HandleBackendStatus(const FComfyBackendStatus& Status)
+{
+	const UComfySubsystem* Comfy = UComfySubsystem::Get();
+	const UComfyWorkflow* Workflow = GetSelectedWorkflow();
+	if (!Comfy || !Workflow || Status.Backend != Comfy->GetActiveBackend())
+	{
+		return;
+	}
+	// New model lists: keep a choice the backend has, otherwise take its best match.
+	for (const FComfyWorkflowInput& Input : Workflow->Inputs)
+	{
+		if (Input.Type != EComfyInputType::Model)
+		{
+			continue;
+		}
+		const TArray<FString> Options = Comfy->GetInputOptions(NAME_None, Workflow, Input.Name);
+		const FString* Current = InputValues.Find(Input.Name);
+		if (!Current || !Options.Contains(*Current))
+		{
+			InputValues.Add(Input.Name, Comfy->GetDefaultInputValue(NAME_None, Workflow, Input.Name));
+		}
+	}
+	RebuildForm();
 }
 
 void SComfyStudio::CheckActiveBackend()
@@ -366,7 +391,7 @@ void SComfyStudio::OnWorkflowSelected(TSharedPtr<FWorkflowItem> Item, ESelectInf
 	{
 		for (const FComfyWorkflowInput& Input : Workflow->Inputs)
 		{
-			InputValues.Add(Input.Name, Input.Type == EComfyInputType::Seed ? FString(TEXT("random")) : Input.DefaultValue);
+			InputValues.Add(Input.Name, Input.Type == EComfyInputType::Seed ? FString(TEXT("random")) : UComfySubsystem::Get()->GetDefaultInputValue(NAME_None, Workflow, Input.Name));
 		}
 	}
 	RebuildForm();
@@ -614,11 +639,17 @@ TSharedRef<SWidget> SComfyStudio::MakeInputWidget(const FComfyWorkflowInput& Inp
 				})
 			];
 
+	case EComfyInputType::Model:
 	case EComfyInputType::Enum:
-		if (Input.Options.Num() > 0)
+	{
+		// Model choices come from the backend; enum choices from the manifest.
+		const TArray<FString> Choices = Input.Type == EComfyInputType::Model
+			? UComfySubsystem::Get()->GetInputOptions(NAME_None, GetSelectedWorkflow(), Input.Name)
+			: Input.Options;
+		if (Choices.Num() > 0)
 		{
 			TSharedPtr<TArray<TSharedPtr<FString>>> Options = MakeShared<TArray<TSharedPtr<FString>>>();
-			for (const FString& Option : Input.Options)
+			for (const FString& Option : Choices)
 			{
 				Options->Add(MakeShared<FString>(Option));
 			}
@@ -631,6 +662,7 @@ TSharedRef<SWidget> SComfyStudio::MakeInputWidget(const FComfyWorkflowInput& Inp
 					SNew(STextBlock).Text_Lambda(Getter)
 				];
 		}
+	}
 		[[fallthrough]];
 
 	default:

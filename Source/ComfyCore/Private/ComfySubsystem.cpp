@@ -229,6 +229,32 @@ TArray<FString> UComfySubsystem::GetMissingNodeClasses(FName Backend, const UCom
 	return Missing;
 }
 
+TArray<FString> UComfySubsystem::GetInputOptions(FName Backend, const UComfyWorkflow* Workflow, const FString& InputName) const
+{
+	FComfyWorkflowInput Input;
+	const FComfyBackendStatus* Status = Statuses.Find(Backend.IsNone() ? GetActiveBackend() : Backend);
+	if (!Workflow || !Status || !Workflow->FindInput(InputName, Input))
+	{
+		return {};
+	}
+	const TArray<FString>* Options = Status->InputOptions.Find(Workflow->GetNodeClass(Input.NodeId) + TEXT(".") + Input.InputName);
+	return Options ? *Options : TArray<FString>();
+}
+
+FString UComfySubsystem::GetDefaultInputValue(FName Backend, const UComfyWorkflow* Workflow, const FString& InputName) const
+{
+	FComfyWorkflowInput Input;
+	if (!Workflow || !Workflow->FindInput(InputName, Input))
+	{
+		return FString();
+	}
+	if (Input.Type != EComfyInputType::Model)
+	{
+		return Input.DefaultValue;
+	}
+	return ComfyTypes::PickModel(GetInputOptions(Backend, Workflow, InputName), Input.Prefer, Input.DefaultValue);
+}
+
 // ---------------------------------------------------------------------------------------------
 // Jobs
 
@@ -290,6 +316,18 @@ UComfyJob* UComfySubsystem::RunWorkflow(UComfyWorkflow* Workflow, const TMap<FSt
 	UComfyJob* Job = NewJob(BackendName, Workflow ? Workflow->GetDisplayNameString() : TEXT("(no workflow)"));
 	Job->Workflow = Workflow;
 	Job->Inputs = Inputs;
+	if (Workflow)
+	{
+		// Model files differ between machines and Cloud, so an unset model input takes this backend's best match.
+		for (const FComfyWorkflowInput& Input : Workflow->Inputs)
+		{
+			const FString* Value = Inputs.Find(Input.Name);
+			if (Input.Type == EComfyInputType::Model && (!Value || Value->IsEmpty()))
+			{
+				Job->Inputs.Add(Input.Name, GetDefaultInputValue(BackendName, Workflow, Input.Name));
+			}
+		}
+	}
 
 	if (!Workflow)
 	{

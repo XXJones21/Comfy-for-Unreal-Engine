@@ -89,6 +89,9 @@ public:
 	 */
 	TSharedPtr<FJsonObject> BuildGraph(const TMap<FString, FString>& Values, const TMap<FString, TSharedPtr<FJsonValue>>& FileReferences, FString& OutError) const;
 
+	/** class_type of a node in the graph, or empty. */
+	FString GetNodeClass(const FString& NodeId) const;
+
 	/** Manifest output name for a node id, or empty. */
 	const FComfyWorkflowOutput* FindOutputForNode(const FString& NodeId) const;
 

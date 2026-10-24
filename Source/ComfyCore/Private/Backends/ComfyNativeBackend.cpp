@@ -82,6 +82,7 @@ void FComfyNativeBackend::Probe(TFunction<void(const FComfyBackendStatus&)> Call
 				{
 					Status.NodeClasses.Add(Pair.Key);
 				}
+				ComfyTypes::ReadInputOptions(Info.Json, Status.InputOptions);
 				Status.Summary += FString::Printf(TEXT(", %d node types"), Status.NodeClasses.Num());
 			}
 			Callback(Status);

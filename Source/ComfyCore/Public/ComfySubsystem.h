@@ -94,6 +94,14 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Comfy|Backends")
 	bool SpendsCredits(FName Backend, const UComfyWorkflow* Workflow) const;
 
+	/** Choices the backend reports for a workflow input (model files, enums). Empty when unknown: probe the backend first. */
+	UFUNCTION(BlueprintPure, Category = "Comfy|Backends")
+	TArray<FString> GetInputOptions(FName Backend, const UComfyWorkflow* Workflow, const FString& InputName) const;
+
+	/** The value a Model input gets when nobody sets it: the first backend file matching its Prefer list, else its default. */
+	UFUNCTION(BlueprintPure, Category = "Comfy|Backends")
+	FString GetDefaultInputValue(FName Backend, const UComfyWorkflow* Workflow, const FString& InputName) const;
+
 	/** Node classes the workflow needs that the backend doesn't have. Empty when all are there, or when the backend can't say. */
 	UFUNCTION(BlueprintPure, Category = "Comfy|Backends")
 	TArray<FString> GetMissingNodeClasses(FName Backend, const UComfyWorkflow* Workflow) const;

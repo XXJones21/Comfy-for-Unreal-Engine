@@ -2,6 +2,8 @@
 
 #include "ComfyTypes.h"
 #include "Misc/Paths.h"
+#include "Dom/JsonObject.h"
+#include "Dom/JsonValue.h"
 
 namespace ComfyTypes
 {
@@ -67,5 +69,79 @@ namespace ComfyTypes
 	bool IsTerminal(EComfyJobState State)
 	{
 		return State == EComfyJobState::Succeeded || State == EComfyJobState::Failed || State == EComfyJobState::Canceled;
+	}
+
+	FString PickModel(const TArray<FString>& Options, const TArray<FString>& Prefer, const FString& Fallback)
+	{
+		for (const FString& Wanted : Prefer)
+		{
+			for (const FString& Option : Options)
+			{
+				if (Option.Equals(Wanted, ESearchCase::IgnoreCase) || FPaths::GetCleanFilename(Option).Equals(Wanted, ESearchCase::IgnoreCase))
+				{
+					return Option;
+				}
+			}
+			for (const FString& Option : Options)
+			{
+				if (Option.Contains(Wanted, ESearchCase::IgnoreCase))
+				{
+					return Option;
+				}
+			}
+		}
+		if (Options.Num() == 0 || Options.Contains(Fallback))
+		{
+			return Fallback;
+		}
+		return Options[0];
+	}
+
+	void ReadInputOptions(const TSharedPtr<FJsonObject>& ObjectInfo, TMap<FString, TArray<FString>>& OutOptions)
+	{
+		if (!ObjectInfo.IsValid())
+		{
+			return;
+		}
+		for (const TPair<FString, TSharedPtr<FJsonValue>>& Node : ObjectInfo->Values)
+		{
+			const TSharedPtr<FJsonObject> NodeObject = Node.Value.IsValid() ? Node.Value->AsObject() : nullptr;
+			const TSharedPtr<FJsonObject>* Input = nullptr;
+			if (!NodeObject.IsValid() || !NodeObject->TryGetObjectField(TEXT("input"), Input) || !Input)
+			{
+				continue;
+			}
+			for (const TCHAR* Group : { TEXT("required"), TEXT("optional") })
+			{
+				const TSharedPtr<FJsonObject>* Fields = nullptr;
+				if (!(*Input)->TryGetObjectField(Group, Fields) || !Fields)
+				{
+					continue;
+				}
+				for (const TPair<FString, TSharedPtr<FJsonValue>>& Field : (*Fields)->Values)
+				{
+					// A list input is [[choice, ...], {options}]; other inputs start with a type name.
+					const TArray<TSharedPtr<FJsonValue>>* Spec = nullptr;
+					const TArray<TSharedPtr<FJsonValue>>* Choices = nullptr;
+					if (!Field.Value.IsValid() || !Field.Value->TryGetArray(Spec) || Spec->Num() == 0 || !(*Spec)[0]->TryGetArray(Choices))
+					{
+						continue;
+					}
+					TArray<FString> Names;
+					for (const TSharedPtr<FJsonValue>& Choice : *Choices)
+					{
+						FString Name;
+						if (Choice.IsValid() && Choice->TryGetString(Name))
+						{
+							Names.Add(Name);
+						}
+					}
+					if (Names.Num() > 0)
+					{
+						OutOptions.Add(FString(Node.Key) + TEXT(".") + FString(Field.Key), MoveTemp(Names));
+					}
+				}
+			}
+		}
 	}
 }

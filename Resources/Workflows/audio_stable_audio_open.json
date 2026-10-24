@@ -40,6 +40,31 @@
         "node_id": "3",
         "input": "steps",
         "type": "Int"
+      },
+      {
+        "name": "ckpt_name",
+        "label": "Checkpoint",
+        "node_id": "4",
+        "input": "ckpt_name",
+        "type": "Model",
+        "prefer": [
+          "stable-audio-open-1.0",
+          "stable-audio-open",
+          "stable_audio"
+        ],
+        "family": "stable-audio-open"
+      },
+      {
+        "name": "text_encoder",
+        "label": "Text encoder",
+        "node_id": "10",
+        "input": "clip_name",
+        "type": "Model",
+        "prefer": [
+          "t5-base",
+          "t5_base"
+        ],
+        "family": "t5-base"
       }
     ],
     "outputs": [
