@@ -190,7 +190,7 @@ svg.diagram{width:100%;height:auto;display:block}
     <div class="brand"><img src="{{img:comfy-icon.png}}" alt=""><span class="kicker">Living design document</span></div>
     <h1>Comfy for Unreal</h1>
     <p class="tagline">ComfyUI inside the Unreal Editor. Workflows in, game-ready assets out.</p>
-    <p class="meta">Version 0.2 · 2026-10-25 · Comfy Org DevRel · Status: proof of concept, built for UE 5.8</p>
+    <p class="meta">Version 0.3 · 2026-10-25 · Comfy Org DevRel · Status: preparing an internal alpha, built for UE 5.8</p>
     <p class="truth">This is the source of truth for the product's experience and design. It extends the earlier proposal page and <code>docs/SPEC.md</code>, and the <a href="#changelog" style="color:#31b9f4">changelog</a> records each revision.</p>
   </div>
 </header>
@@ -212,10 +212,11 @@ svg.diagram{width:100%;height:auto;display:block}
     <li><a href="#automation"><span class="n">9</span>Blueprint, Python and agents</a></li>
     <li><a href="#visual"><span class="n">10</span>Visual design</a></li>
     <li><a href="#state"><span class="n">11</span>Where it stands</a></li>
-    <li><a href="#roadmap"><span class="n">12</span>Roadmap</a></li>
-    <li><a href="#questions"><span class="n">13</span>Open questions</a></li>
-    <li><a href="#decisions"><span class="n">14</span>Decision log</a></li>
-    <li><a href="#changelog"><span class="n">15</span>Changelog</a></li>
+    <li><a href="#alpha"><span class="n">12</span>Path to alpha</a></li>
+    <li><a href="#roadmap"><span class="n">13</span>Roadmap</a></li>
+    <li><a href="#questions"><span class="n">14</span>Open questions</a></li>
+    <li><a href="#decisions"><span class="n">15</span>Decision log</a></li>
+    <li><a href="#changelog"><span class="n">16</span>Changelog</a></li>
   </ol>
 </nav>
 
@@ -501,11 +502,13 @@ svg.diagram{width:100%;height:auto;display:block}
     <tbody>
       <tr><td class="k">Workflow picker</td><td>Name with type and origin (Project, Server, Built-in). The menu groups by origin, then type.</td><td><span class="chip built">built</span> Thumbnails <span class="chip todo">to build</span></td></tr>
       <tr><td class="k">Input cards</td><td>One rounded card per input of the chosen workflow, built from its manifest or detected from the graph (see <a href="#form-from-workflow">section 7</a>). A tall prompt box; image drop zones; seed with Randomize; model and choice dropdowns; number fields. Before a workflow is chosen, the column shows a one-line hint and nothing else.</td><td><span class="chip built">built</span> Sliders with ranges <span class="chip todo">to build</span></td></tr>
+      <tr><td class="k">Start from</td><td>A row of preset buttons above the cards, from the manifest's <code>presets</code>: <i>Brick</i>, <i>Snow</i>, <i>Combat</i>, <i>Sword hit</i>. One click fills the inputs with a working example; the tooltip lists the values.</td><td><span class="chip built">built</span></td></tr>
+      <tr><td class="k">Missing models</td><td>When the backend has none of the files a Model input prefers, the card says <i>Not found on this backend: flux2-vae.safetensors (321 MB). It goes in ComfyUI/models/vae.</i> with a <b>Download</b> button. Run stops before sending and lists every missing file. An empty texture input takes the Content Browser selection, or says what it needs.</td><td><span class="chip built">built</span></td></tr>
       <tr><td class="k">In Unreal</td><td>Auto-import, make a material from images, tileable with derived normal, destination folder. Shown once a workflow is chosen.</td><td><span class="chip built">built</span></td></tr>
       <tr><td class="k">Run bar</td><td>A labelled <b>Batch</b> count and a large blue Run button, pinned to the bottom of the column. Run is disabled, and looks it, while the backend is unreachable.</td><td><span class="chip built">built</span></td></tr>
       <tr><td class="k">Project runs</td><td>A dropdown under the Run bar: this project's runs, newest first, with thumbnail, title, time and state. The tooltip lists the inputs. Opening one shows its result and puts its workflow and inputs back in the form. Each run is kept as <code>job.json</code> beside its outputs in <code>Saved/Comfy/Jobs</code>, so the list survives restarts and stays on the user's machine.</td><td><span class="chip built">built</span></td></tr>
       <tr><td class="k">Welcome card and notices</td><td>Above the library when the backend needs something: a card for first-run paths (connect, sign in, refused key), a one-line notice for everything else.</td><td><span class="chip built">built</span></td></tr>
-      <tr><td class="k">Gallery</td><td>Large preview of the selected result, actions, then a strip of results and in-flight jobs with progress.</td><td><span class="chip built">built</span> Audio and mesh previews <span class="chip todo">to build</span></td></tr>
+      <tr><td class="k">Gallery</td><td>Large preview of the selected result, actions, then a strip of results and in-flight jobs with progress.</td><td><span class="chip built">built</span> <b>Play</b>/<b>Stop</b> for sounds, <b>Open mesh</b> for meshes <span class="chip built">built</span> Waveform and turntable <span class="chip todo">later</span></td></tr>
       <tr><td class="k">Actions</td><td>Import, Replace on selection, Revert, Show in Content Browser, Open in Graph.</td><td><span class="chip built">built</span></td></tr>
       <tr><td class="k">Empty state</td><td>"What do you want to make?" with workflow cards grouped by type. Each card has a one-line title and a two-line description; a workflow sent without a description lists its inputs instead.</td><td><span class="chip built">built</span></td></tr>
     </tbody>
@@ -520,21 +523,25 @@ svg.diagram{width:100%;height:auto;display:block}
         <div class="dim">Pick a workflow. Send your own from the Graph view, or from ComfyUI with the Comfy for Unreal extension.</div>
         <div class="sec">TEXTURE</div>
         <div class="grid3">
-          <div class="wcard"><b>Seamless Texture (Cloud)</b><span class="dim">Core nodes only, runs on Cloud.</span><br><span class="chipm">Built-in</span></div>
-          <div class="wcard"><b>Seamless Texture (Flux Dev GGUF)</b><span class="dim">Higher quality, 12-16 GB GPUs.</span><br><span class="chipm">Built-in</span></div>
+          <div class="wcard"><b>Seamless Texture</b><span class="dim">A surface texture from a prompt, FLUX.2 Klein 4B.</span><br><span class="chipm">Built-in</span></div>
+          <div class="wcard"><b>Texture Restyle</b><span class="dim">Changes a selected texture from an instruction.</span><br><span class="chipm">Built-in</span></div>
           <div class="wcard"><b>texture-generation-v3</b><span class="dim">PBR maps for the studio's engine preset.</span><br><span class="chipm">Project</span></div>
         </div>
         <div class="sec">SOUND</div>
-        <div class="grid3"><div class="wcard"><b>Sound Effect (Stable Audio Open)</b><span class="dim">Up to 47 seconds, imported as a Sound Wave.</span><br><span class="chipm">Built-in</span></div></div>
+        <div class="grid3"><div class="wcard"><b>Sound Effect</b><span class="dim">Up to 47 seconds, imported as a Sound Wave.</span><br><span class="chipm">Built-in</span></div></div>
+        <div class="sec">MUSIC</div>
+        <div class="grid3"><div class="wcard"><b>Music Track</b><span class="dim">Instrumental by default; add lyrics for vocals.</span><br><span class="chipm">Built-in</span></div></div>
         <div class="sec">MESH</div>
-        <div class="grid3"><div class="wcard"><b>Image to Mesh (Hunyuan3D 2)</b><span class="dim">Untextured mesh from one image.</span><br><span class="chipm">Built-in</span></div></div>
+        <div class="grid3"><div class="wcard"><b>Image to Mesh</b><span class="dim">Untextured mesh from one image.</span><br><span class="chipm">Built-in</span></div></div>
+        <div class="sec">UPSCALE</div>
+        <div class="grid3"><div class="wcard"><b>Texture Upscale</b><span class="dim">A larger, sharper copy of a selected texture.</span><br><span class="chipm">Built-in</span></div></div>
       </div>
     </div>
   </div>
 
   <figure>
     <img src="{{img:run-library.jpg}}" alt="The Run view's library on Comfy Cloud, signed in, with a one-line notice that the API key in COMFY_API_KEY was refused and isn't used">
-    <figcaption>The library on October 25. The old key in <code>COMFY_API_KEY</code> was refused, so Studio runs with the sign-in and says so in one line instead of blocking.</figcaption>
+    <figcaption>The library on October 25, before the starter workflows replaced the old built-ins (a new screenshot is on the list). The old key in <code>COMFY_API_KEY</code> was refused, so Studio runs with the sign-in and says so in one line instead of blocking.</figcaption>
   </figure>
 
   <h3 id="graph-view">Graph view</h3>
@@ -619,18 +626,29 @@ svg.diagram{width:100%;height:auto;display:block}
   <p>Detection uses a fixed list of names. Widgets outside it, such as <code>sampler_name</code>, <code>scheduler</code>, <code>guidance</code> or a custom node's own fields, stay as saved in the graph. To put them in the form, expose them with the extension. The canvas save format is refused with a message that asks for Export (API).</p>
   <h3 id="model-inputs">Model inputs that travel</h3>
   <p>Model files differ between machines and Cloud. A <code>Model</code> input lists what the connected backend has and picks the first match from the workflow's <code>prefer</code> list (exact name first, then substring). That fixed a real failure on the test PC, where <code>ae.safetensors</code> turned out to be an SDXL VAE.</p>
-  <h3 id="built-ins">Built-in workflows</h3>
+  <p>When the backend has none of the preferred files, Studio no longer falls back to the first file in the folder, which ran an unrelated model and failed late with a confusing error. The manifest's optional <code>download</code> block (<code>file</code>, <code>folder</code>, <code>size</code>, <code>url</code>) feeds a plain message and a <b>Download</b> button instead, and the run stops before anything is sent. Workflows without a <code>prefer</code> list keep the old behaviour.</p>
+  <h3 id="built-ins">Starter workflows</h3>
+  <p>The five old built-ins (three Seamless Texture variants, one needing a custom node) became six starters, one per job. Each uses ComfyUI core nodes only and models that are all on Comfy Cloud, so the same file runs on Cloud and on Desktop. Node settings follow the official Comfy-Org templates.</p>
   <div class="tbl"><table>
-    <thead><tr><th>Workflow</th><th>Type</th><th>Runs on</th><th>State</th></tr></thead>
+    <thead><tr><th>Starter</th><th>Type</th><th>Model</th><th>Desktop download</th><th>Official template it follows</th><th>State</th></tr></thead>
     <tbody>
-      <tr><td>Seamless Texture (Cloud)</td><td>Texture</td><td>Cloud, any install with a Flux fp8 checkpoint</td><td><span class="chip built">ran on Cloud</span></td></tr>
-      <tr><td>Seamless Texture (Flux Dev GGUF)</td><td>Texture</td><td>Local, 12-16 GB GPU</td><td><span class="chip built">ran locally</span></td></tr>
-      <tr><td>Seamless Texture (Flux Schnell)</td><td>Texture</td><td>Local with the fp8 checkpoint</td><td><span class="chip partial">untested</span></td></tr>
-      <tr><td>Sound Effect (Stable Audio Open)</td><td>Sound</td><td>Local, Cloud</td><td><span class="chip partial">models not on test PC</span></td></tr>
-      <tr><td>Image to Mesh (Hunyuan3D 2)</td><td>Mesh</td><td>Local, about 12 GB</td><td><span class="chip partial">models not on test PC</span></td></tr>
+      <tr><td class="k">Seamless Texture</td><td>Texture</td><td>FLUX.2 Klein 4B distilled, 4 steps</td><td>11.6 GB</td><td><code>image_flux2_klein_text_to_image</code></td><td><span class="chip partial">checked, not run</span></td></tr>
+      <tr><td class="k">Texture Restyle</td><td>Texture</td><td>FLUX.2 Klein 4B edit</td><td>same files</td><td><code>image_flux2_klein_image_edit_4b_distilled</code></td><td><span class="chip partial">checked, not run</span></td></tr>
+      <tr><td class="k">Texture Upscale</td><td>Upscale</td><td>Real-ESRGAN x4</td><td>67 MB</td><td><code>utility-gan_upscaler</code></td><td><span class="chip partial">checked, not run</span></td></tr>
+      <tr><td class="k">Sound Effect</td><td>Sound</td><td>Stable Audio Open 1.0</td><td>5.8 GB</td><td><code>audio_stable_audio_example</code></td><td><span class="chip partial">checked, not run</span></td></tr>
+      <tr><td class="k">Music Track</td><td>Music</td><td>ACE-Step 1.5 turbo</td><td>10 GB</td><td><code>audio_ace_step_1_5_checkpoint</code></td><td><span class="chip partial">checked, not run</span></td></tr>
+      <tr><td class="k">Image to Mesh</td><td>Mesh</td><td>Hunyuan3D 2.0, surface net</td><td>4.9 GB</td><td><code>3d_hunyuan3d_image_to_model</code></td><td><span class="chip partial">checked, not run</span></td></tr>
     </tbody>
   </table></div>
-  <p><b>Next: starter templates.</b> Three Seamless Texture variants is one too many. The built-ins become one generic template per job, made from core nodes so the same file runs on Comfy Cloud and on Desktop. <code>docs/design/templates-investigation.md</code> proposes seven: Seamless Texture and Texture Restyle (FLUX.2 Klein 4B), Texture Upscale (RealESRGAN), Sound Effect (Stable Audio), Music (ACE-Step 1.5), Image to Mesh (TRELLIS.2), and a partner-node Game Asset (Tripo). Each workflow is a starting point; the plugin is the sandbox.</p>
+  <p>"Checked" means <code>tools/build_starter_workflows.py</code>, which writes the bundles, validated every graph offline against Comfy Cloud's node specs: classes exist, required inputs are set, links have the right types, combo values and model names are allowed, and every manifest input and output points at a real widget or save node. It doesn't prove the output looks good; that needs a run on each backend.</p>
+  <p>Kept out of the first set, from <code>templates-investigation.md</code>:</p>
+  <ul>
+    <li><b>An in-graph seam pass</b> for Seamless Texture. The plugin's <i>Tileable</i> option still makes textures tile.</li>
+    <li><b>A wrap pad</b> so upscaling keeps a tileable texture tileable.</li>
+    <li><b>TRELLIS.2</b>, a textured PBR mesh under MIT. Heavier, and its VRAM needs are unknown. Hunyuan3D 2.0 is lighter but its license excludes the EU, UK and South Korea, which matters for a public release.</li>
+    <li><b>Game Asset (Partner)</b> with Tripo, rig and animate. A rigged result needs Skeletal Mesh and Animation import, which the plugin doesn't have.</li>
+    <li><b>Sprite, icon or decal</b> with a cut-out background.</li>
+  </ul>
 </section>
 
 <!-- ============================================================ 8 -->
@@ -728,7 +746,7 @@ svg.diagram{width:100%;height:auto;display:block}
 <section class="doc" id="state">
   <div class="sec-num">11</div>
   <h2>Where it stands</h2>
-  <p class="lede">A working proof of concept on UE 5.8, built and tested on one PC between October 22 and 25.</p>
+  <p class="lede">A working proof of concept on UE 5.8, built and tested on one PC between October 22 and 25, now being packaged for an internal alpha.</p>
   <div class="tbl"><table>
     <thead><tr><th>Area</th><th>State</th><th>Notes</th></tr></thead>
     <tbody>
@@ -740,6 +758,10 @@ svg.diagram{width:100%;height:auto;display:block}
       <tr><td class="k">ComfyUI extension</td><td><span class="chip partial">built, not loaded</span></td><td>Loads on the next ComfyUI restart.</td></tr>
       <tr><td class="k">Comfy Cloud</td><td><span class="chip built">tested</span></td><td>Runs through the sign-in with no key; the refused old key is skipped. Credits shown and updated after runs (1,751 → 1,749 for one texture).</td></tr>
       <tr><td class="k">Run history</td><td><span class="chip built">tested</span></td><td>Runs kept in <code>Saved/Comfy/Jobs</code> and listed under Project runs.</td></tr>
+      <tr><td class="k">Starter workflows</td><td><span class="chip partial">checked, not run</span></td><td>Six core-node starters with presets, generated and validated offline. Waiting on a run of each on Cloud and Desktop.</td></tr>
+      <tr><td class="k">Missing models, presets, previews</td><td><span class="chip partial">built, not run</span></td><td>Compiles clean in the package build; not yet seen in the editor.</td></tr>
+      <tr><td class="k">Alpha package</td><td><span class="chip partial">in test</span></td><td>RunUAT BuildPlugin output for Win64; being installed on a second project.</td></tr>
+      <tr><td class="k">Docs</td><td><span class="chip partial">draft</span></td><td><code>docs/user/get-started.mdx</code> in the Comfy docs style, and an updated README. Download link, extension install, feedback channel and 12 screenshots still to fill.</td></tr>
       <tr><td class="k">Tests</td><td><span class="chip todo">to build</span></td><td>Mock-backend automation tests.</td></tr>
     </tbody>
   </table></div>
@@ -747,19 +769,69 @@ svg.diagram{width:100%;height:auto;display:block}
     <figure><img src="{{img:run-v1.jpg}}" alt="The first Comfy Studio Run view"><figcaption>October 24, morning: the first Run view, before the App-mode redesign.</figcaption></figure>
     <figure><img src="{{img:run-cloud.jpg}}" alt="The Run view on October 25 after a Comfy Cloud run"><figcaption>October 25: the App-mode Run view after a Cloud run through the sign-in.</figcaption></figure>
   </div>
-  <p class="small muted">Repositories (local, not yet pushed): <code>D:\Comfy\comfy-unreal</code> (plugin, latest <code>20e930e</code>) and <code>D:\Comfy\comfy-for-unreal</code> (extension, <code>66b829a</code>).</p>
+  <p class="small muted">Repositories (local, not yet pushed): <code>D:\Comfy\comfy-unreal</code> (plugin, latest <code>26cf2f3</code>) and <code>D:\Comfy\comfy-for-unreal</code> (extension, <code>66b829a</code>).</p>
 </section>
 
 <!-- ============================================================ 12 -->
-<section class="doc" id="roadmap">
+<section class="doc" id="alpha">
   <div class="sec-num">12</div>
+  <h2>Path to alpha</h2>
+  <p class="lede">The bar: a coworker on another machine installs the zip, connects, makes a texture, a sound and a mesh, and can tell us what broke, with nobody helping.</p>
+  <p>Target: the alpha in coworkers' hands around <b>October 31</b>, leaving a week of fixes before the beta on November 8 and the jam on November 12.</p>
+
+  <h3 id="alpha-must">Must have before anyone else touches it</h3>
+  <div class="tbl"><table>
+    <thead><tr><th>#</th><th>Work</th><th>State</th><th>What's left</th></tr></thead>
+    <tbody>
+      <tr><td class="k">1</td><td><b>Installs on a machine that isn't ours.</b> A prebuilt Win64 zip, a one-page install guide, and a test on a clean project.</td><td><span class="chip partial">in test</span></td><td>Clean-project test (in progress). Does it load in a Blueprint-only project without a rebuild prompt? Default backend: Desktop today, so a tester without ComfyUI starts on "Connect Comfy". Decide whether to start on Comfy Cloud when no local ComfyUI answers.</td></tr>
+      <tr><td class="k">2</td><td><b>A starter set that works on Cloud and Desktop.</b> Texture, restyle, upscale, sound, music, mesh, with presets, missing-model help and sound and mesh previews.</td><td><span class="chip partial">built, not run</span></td><td>Run each starter on Comfy Cloud and on Desktop and judge the output. Swap Seamless Texture back to the proven Flux Schnell graph if Klein disappoints.</td></tr>
+      <tr><td class="k">3</td><td><b>The Cloud page bridge holds up.</b></td><td><span class="chip todo">to build</span></td><td>A clear message when Cloud's frontend changes under the bridge, instead of 0 credits. The out-of-credits (402) and zero-free-runs cases, each with a next step. Cancel a running job; close the editor mid-run. Ask the Cloud team about the bridge informally.</td></tr>
+      <tr><td class="k">4</td><td><b>A way to hear back.</b></td><td><span class="chip todo">to build</span></td><td>A known-issues list and a short test script so testers cover the same paths. A <b>Send feedback</b> link in Studio that opens the channel and attaches the plugin's log lines. The channel isn't chosen.</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3 id="alpha-should">Should have: makes it feel like a product</h3>
+  <div class="tbl"><table>
+    <thead><tr><th>#</th><th>Work</th><th>State</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td class="k">5</td><td><b>Save from the Cloud page into the project.</b> Test <b>Send to Unreal</b> on Cloud first; the full version injects the extension's tagging into the Cloud page.</td><td><span class="chip todo">to test</span></td><td>See open question on the extension on Cloud.</td></tr>
+      <tr><td class="k">6</td><td><b>Load the extension in ComfyUI</b> and give testers an install route (a zip into <code>custom_nodes</code>, or the Comfy Registry).</td><td><span class="chip partial">built, not loaded</span></td><td>For workflow authors among the testers.</td></tr>
+      <tr><td class="k">7</td><td><b>Cost before Run</b> on Cloud, and partner-node runs flagged.</td><td><span class="chip todo">to build</span></td><td>Missing-model check is done.</td></tr>
+      <tr><td class="k">8</td><td><b>Polish:</b> a friendlier Graph page when ComfyUI is stopped; the API key walkthrough in Settings.</td><td><span class="chip todo">to build</span></td><td></td></tr>
+      <tr><td class="k">9</td><td><b>Screenshots</b> for the README (5) and the get-started page (7), plus a new library shot for this doc.</td><td><span class="chip todo">to take</span></td><td>Spots and file names are marked in both files.</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3 id="alpha-later">After the alpha</h3>
+  <ul>
+    <li>Automation tests with a mock backend.</li>
+    <li>Textured mesh (TRELLIS.2), the partner Game Asset template, and Skeletal Mesh and Animation import for rigged results.</li>
+    <li>In-graph seam pass, wrap-pad upscaling, and the sprite and decal template.</li>
+    <li>Thumbnails in the workflow picker, sliders with ranges, one run per selected asset.</li>
+    <li>Run history shared across a team.</li>
+    <li>Agent toolset polish: presets and missing-model info in the tool schema.</li>
+    <li>macOS and Linux, Fab and ComfyUI Manager listings.</li>
+  </ul>
+
+  <h3 id="alpha-decisions">Decisions needed</h3>
+  <ol>
+    <li><b>Distribution.</b> Neither repository has a remote. A private GitHub repository with Releases gives testers one place for builds and issues.</li>
+    <li><b>Scope.</b> Cloud-first only, or Desktop too? Cloud-first is much easier to support, because every tester has the same models.</li>
+    <li><b>Feedback channel.</b> A Slack channel, a form or GitHub issues.</li>
+    <li><b>Default backend</b> for a new install (see item 1).</li>
+  </ol>
+</section>
+
+<!-- ============================================================ 13 -->
+<section class="doc" id="roadmap">
+  <div class="sec-num">13</div>
   <h2>Roadmap</h2>
   <div class="tbl"><table>
     <thead><tr><th>When</th><th>Milestone</th><th>Scope</th></tr></thead>
     <tbody>
-      <tr><td class="k">Oct 25 – 31</td><td>Verify and polish</td><td><s>Review the Run view; first-run welcome card and Desktop auto-detection; the Cloud page bridge and a first Cloud run; credits in the status line; run history.</s> Done October 25. Next: a Cloud save bridge, so workflows and results made in the Cloud page can be saved into the project the way the extension does locally (inject the extension's frontend into the Cloud page); test the extension in ComfyUI; a friendlier Graph empty state; the API key walkthrough in Settings; continue the UX walkthrough from Journey 2.</td></tr>
-      <tr><td class="k">Oct 28 – Nov 4</td><td>Starter templates</td><td>Replace the built-ins with the generic, core-node templates from <code>templates-investigation.md</code>, each tested on Desktop and Cloud.</td></tr>
-      <tr><td class="k">Nov 1 – 7</td><td>Jam-ready content</td><td>Model checks and download offers; run cost before Run; a sample project.</td></tr>
+      <tr><td class="k">Oct 25</td><td>Verify and polish</td><td><s>Review the Run view; first-run welcome card and Desktop auto-detection; the Cloud page bridge and a first Cloud run; credits in the status line; run history; starter workflows; missing-model check and downloads; presets; sound and mesh previews; get-started draft.</s> Done.</td></tr>
+      <tr><td class="k">Oct 26 – 31</td><td>Alpha</td><td>The must-haves in <a href="#alpha">Path to alpha</a>: clean-machine install, every starter run on both backends, bridge failure cases, feedback loop. Coworkers get the zip around October 31.</td></tr>
+      <tr><td class="k">Nov 1 – 7</td><td>Alpha fixes, jam-ready content</td><td>Fixes from tester feedback; the should-haves (save from Cloud, extension install, cost before Run); a sample project; screenshots.</td></tr>
       <tr><td class="k">Nov 8 – 11</td><td>Beta</td><td>GitHub release of plugin and extension; docs and a five-minute video; jam credits for Cloud.</td></tr>
       <tr><td class="k">Nov 12 on</td><td>The jam</td><td>Support channel, daily fixes, a friction log from entrants.</td></tr>
       <tr><td class="k">December</td><td>v1.0</td><td>Fab listing, ComfyUI Manager listing, macOS and Linux, Sequencer and Movie Render Queue passes.</td></tr>
@@ -769,7 +841,7 @@ svg.diagram{width:100%;height:auto;display:block}
 
 <!-- ============================================================ 13 -->
 <section class="doc" id="questions">
-  <div class="sec-num">13</div>
+  <div class="sec-num">14</div>
   <h2>Open questions</h2>
   <p class="lede">For the UI review and the UX walkthrough.</p>
   <ol>
@@ -779,16 +851,19 @@ svg.diagram{width:100%;height:auto;display:block}
     <li><b>The extension on Cloud.</b> Cloud doesn't load custom nodes. Studio could inject the extension's frontend script (tagging, Send to Unreal) into the Cloud page itself and store the library in Cloud's user data. Is that acceptable, and does Cloud keep <code>extra.comfy_unreal</code> when it saves a workflow?</li>
     <li><b>Graph toolbar.</b> Once the extension is installed, keep Unreal's own Send to Unreal button above the page, or rely on the one inside ComfyUI?</li>
     <li><b>Batch semantics.</b> Batch count runs N jobs with new seeds. Should "selected textures" run one job per selected asset, like RTX Remix?</li>
-    <li><b>Preview for sound and mesh.</b> A waveform with play, and a turntable, or open the asset editor?</li>
+    <li><b>Preview for sound and mesh.</b> <i>Partly answered October 25: Play/Stop in the gallery, and Open mesh opens the Static Mesh Editor. A waveform and a turntable can come later.</i></li>
     <li><b>Brand.</b> Logo usage, the product name, and whether the extension is published by Comfy Org on the registry.</li>
     <li><b>Desktop port.</b> <i>Answered October 25: detect both, plus the ports in Comfy Desktop's installations list.</i></li>
     <li><b>Run history.</b> Kept per user in <code>Saved/</code>. Should a team be able to share it, for example by saving runs beside the workflow asset?</li>
+    <li><b>Texture model.</b> FLUX.2 Klein 4B replaces the proven Flux Schnell graph: smaller for Desktop (11.6 GB against 17 GB) and one family for create and restyle. Is its texture quality as good? The first runs decide.</li>
+    <li><b>Mesh license.</b> Hunyuan3D 2.0's license excludes the EU, UK and South Korea. Fine for an internal alpha; for the public release, switch to TRELLIS.2 (MIT) or ship the mesh template without a default model?</li>
+    <li><b>Upstream templates.</b> Would Comfy-Org take a "Game assets" category in the official templates, so Cloud users get these starters natively?</li>
   </ol>
 </section>
 
 <!-- ============================================================ 14 -->
 <section class="doc" id="decisions">
-  <div class="sec-num">14</div>
+  <div class="sec-num">15</div>
   <h2>Decision log</h2>
   <div class="tbl"><table>
     <thead><tr><th>Date</th><th>Decision</th><th>Why</th></tr></thead>
@@ -806,18 +881,24 @@ svg.diagram{width:100%;height:auto;display:block}
       <tr><td>Oct 25</td><td>Free runs and credits always in the status line, read from the page and refreshed after each run.</td><td>Never surprising: the user sees the cost of exploring as they go.</td></tr>
       <tr><td>Oct 25</td><td>A refused key is skipped, not fatal, when a sign-in exists.</td><td>A stale <code>COMFY_API_KEY</code> blocked a signed-in user; Unreal can't change an environment variable, so it explains instead.</td></tr>
       <tr><td>Oct 25</td><td>Run history is kept per user in <code>Saved/Comfy/Jobs</code>, beside the outputs.</td><td>Survives restarts without adding files to source control.</td></tr>
-      <tr><td>Oct 25</td><td>Built-ins become generic, core-node templates that run on Cloud and Desktop.</td><td>One template per job, not one per model or machine. Workflows show how to start; the plugin is the sandbox.</td></tr>
+      <tr><td>Oct 25</td><td>Built-ins become generic, core-node templates that run on Cloud and Desktop. <i>Built October 25: six starters.</i></td><td>One template per job, not one per model or machine. Workflows show how to start; the plugin is the sandbox.</td></tr>
+      <tr><td>Oct 25</td><td>One model family, FLUX.2 Klein 4B, for texture create and restyle.</td><td>Apache-2.0, on Cloud, about 11.6 GB for Desktop, and one set of downloads serves both starters.</td></tr>
+      <tr><td>Oct 25</td><td>Starters are generated by a script and checked offline against Cloud's node specs.</td><td>Runs cost credits and GPU time; the check catches broken graphs before anyone runs them.</td></tr>
+      <tr><td>Oct 25</td><td>No silent model fallback when a workflow names its models; say what's missing and where to get it.</td><td>The old fallback ran an unrelated file and failed late with a confusing error.</td></tr>
+      <tr><td>Oct 25</td><td>Tiling and PBR maps stay plugin-side for now.</td><td>Deterministic, free and the same on every backend; an in-graph version can come later.</td></tr>
+      <tr><td>Oct 25</td><td>Tester docs follow the Comfy docs style guide, as Mintlify MDX.</td><td>They can move into docs.comfy.org without a rewrite.</td></tr>
     </tbody>
   </table></div>
 </section>
 
 <!-- ============================================================ 15 -->
 <section class="doc" id="changelog">
-  <div class="sec-num">15</div>
+  <div class="sec-num">16</div>
   <h2>Changelog</h2>
   <div class="tbl"><table>
     <thead><tr><th>Version</th><th>Date</th><th>Changes</th></tr></thead>
     <tbody>
+      <tr><td>0.3</td><td>2026-10-25</td><td>Six starter workflows replace the built-ins, with presets, a missing-model message and download, and Play and Open mesh previews. New section: Path to alpha, with the must-have, should-have and later work and the decisions needed. Roadmap, open questions and decision log updated. Get-started page and README drafted.</td></tr>
       <tr><td>0.2</td><td>2026-10-25</td><td>Journey 1 built and tested: local detection, welcome card, Cloud sign-in through the page bridge, account and credits in the status line. UX review fixes: refused-key fallback, plainer errors, type, library cards, left column, disabled states. Project runs (run history). How the form comes from the workflow. Starter-template plan. New screenshots.</td></tr>
       <tr><td>0.1</td><td>2026-10-24</td><td>First version: product shape, seven UX journeys, Studio and extension specs, visual tokens, current state and open questions. Added Cloud sign-in findings and the page-bridge proposal after the first Cloud test.</td></tr>
     </tbody>
