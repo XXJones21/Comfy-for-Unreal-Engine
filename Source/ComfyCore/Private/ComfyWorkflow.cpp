@@ -137,9 +137,9 @@ namespace ComfyWorkflowPrivate
 		{ TEXT("seconds"), EComfyInputType::Float },
 		{ TEXT("duration"), EComfyInputType::Float },
 		{ TEXT("length"), EComfyInputType::Int },
-		{ TEXT("ckpt_name"), EComfyInputType::Enum },
-		{ TEXT("unet_name"), EComfyInputType::Enum },
-		{ TEXT("lora_name"), EComfyInputType::Enum },
+		{ TEXT("ckpt_name"), EComfyInputType::Model },
+		{ TEXT("unet_name"), EComfyInputType::Model },
+		{ TEXT("lora_name"), EComfyInputType::Model },
 	};
 
 	static bool IsLoadNode(const FString& ClassType, FString& OutInputName)
