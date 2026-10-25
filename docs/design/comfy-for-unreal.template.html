@@ -112,7 +112,7 @@ figcaption{font-size:14px;color:var(--muted);margin-top:8px}
 ol.steps{list-style:none;padding:0;margin:0;counter-reset:step}
 ol.steps > li{counter-increment:step;position:relative;padding:0 0 12px 40px;margin:0}
 ol.steps > li::before{content:counter(step);position:absolute;left:0;top:1px;width:26px;height:26px;border-radius:50%;background:var(--card2);border:1px solid var(--border);font-size:13px;font-weight:700;display:grid;place-items:center;color:var(--ink)}
-ol.steps > li b{display:block}
+ol.steps > li > b:first-child{display:block}
 .today{font-size:13.5px;color:var(--muted);border-top:1px dashed var(--line);margin-top:4px;padding-top:10px}
 /* ---------- product mockups (always ComfyUI dark) ---------- */
 .mock{--bg:var(--c800);background:var(--c800);color:#f0efed;border:1px solid var(--c400);border-radius:14px;overflow:hidden;box-shadow:var(--shadow);font:13px/1.45 var(--sans);margin:16px 0}
@@ -190,7 +190,7 @@ svg.diagram{width:100%;height:auto;display:block}
     <div class="brand"><img src="{{img:comfy-icon.png}}" alt=""><span class="kicker">Living design document</span></div>
     <h1>Comfy for Unreal</h1>
     <p class="tagline">ComfyUI inside the Unreal Editor. Workflows in, game-ready assets out.</p>
-    <p class="meta">Version 0.1 · 2026-10-24 · Comfy Org DevRel · Status: proof of concept, built for UE 5.8</p>
+    <p class="meta">Version 0.2 · 2026-10-25 · Comfy Org DevRel · Status: proof of concept, built for UE 5.8</p>
     <p class="truth">This is the source of truth for the product's experience and design. It extends the earlier proposal page and <code>docs/SPEC.md</code>, and the <a href="#changelog" style="color:#31b9f4">changelog</a> records each revision.</p>
   </div>
 </header>
@@ -337,25 +337,27 @@ svg.diagram{width:100%;height:auto;display:block}
 
   <!-- J1 -->
   <div class="journey" id="j-first-run">
-    <h4>1. First run: from install to a connected backend <span class="chip partial">partial</span></h4>
+    <h4>1. First run: from install to a connected backend <span class="chip built">built</span></h4>
     <div class="who">Anyone, once per machine. Goal: under two minutes from enabling the plugin to "Connected".</div>
     <ol class="steps">
       <li><b>Install and enable.</b> From Fab (later) or a GitHub release now. Enabling pulls in Epic's ToolsetRegistry and Python plugins.</li>
       <li><b>Find it.</b> A <b>Comfy</b> button with the Comfy logo sits in the level toolbar, and <i>Tools › Comfy Studio</i> opens the same tab.</li>
-      <li><b>Connect.</b> Studio looks for a ComfyUI it can reach: Comfy Desktop first, then a local install. If one answers, the status line turns green: <i>Connected · ComfyUI 0.39.0, RTX 4080, 14.7 GB free</i>.</li>
-      <li><b>No local ComfyUI?</b> A welcome card offers two paths: <b>Use Comfy Cloud</b> or <b>Download Comfy Desktop</b>. Use Comfy Cloud opens Comfy's own sign-in (Google, GitHub or email) inside the panel. When it finishes, the status line reads <i>Signed in · Joshua · 5 runs left</i>, and Run works with no key. See <a href="#cloud-sign-in">Signing in to Comfy Cloud</a>.</li>
+      <li><b>Connect.</b> Studio looks for a ComfyUI it can reach, in this order: the configured address, the ports in Comfy Desktop's installations list, then <code>8000</code> (Desktop's default) and <code>8188</code> (a manual install). The first that answers <code>/system_stats</code> wins, and the status line turns green: <i>Connected · 127.0.0.1:8000 · ComfyUI 0.39.0, RTX 4080, 14.7 GB free</i>.</li>
+      <li><b>No local ComfyUI?</b> The Run view opens on a welcome card that says why, from what Comfy Desktop has installed: not installed, installed with only Comfy Cloud, or installed but not running. It offers <b>Use Comfy Cloud</b>, <b>Get Comfy Desktop</b> and <b>Connect to a URL…</b>. Retry stays in the status line.</li>
+      <li><b>Sign in to Comfy Cloud.</b> On Cloud with no key, the card is <i>Sign in to Comfy Cloud</i>. <b>Sign in</b> opens Comfy's own sign-in (Google, GitHub or email) in the Graph view. When it finishes, the status line reads <i>Connected · Signed in as Joshua Jones · 1,751 credits</i> (or <i>5 of 5 free runs left</i>), and Run works with no key. See <a href="#cloud-sign-in">Signing in to Comfy Cloud</a>.</li>
       <li><b>Land on the library.</b> With no workflow chosen, the main area shows workflow cards grouped by type, so the first click is "what do I want to make?".</li>
     </ol>
-    <div class="today">Today: the toolbar button, connection states and the library are built. Gaps: there is no auto-detection (the Desktop profile assumes <code>127.0.0.1:8188</code>, while Comfy Desktop's default is <code>8000</code>), no welcome card. Cloud sign-in already works in the Graph view (tested October 24), but Run still asks for an API key: the status line says "No API key" while the page beside it is signed in. Fixing that is the <a href="#cloud-sign-in">page bridge</a>.</div>
+    <div class="today">Today: built and tested on October 25. On the test PC, Comfy Desktop has only a Cloud install, and the card says exactly that. Signing in from the card ran a texture on Cloud with no key. Gaps: <b>Launch Comfy Desktop</b> from the card, and a first-run hint for the Graph view.</div>
   </div>
 
   <div class="mock" role="img" aria-label="Mockup: first-run welcome card in Comfy Studio">
-    <div class="bar"><span class="seg"><span class="on">Run</span><span>Graph</span></span><span class="sel">Desktop ▾</span><span class="dot" style="background:#a0a0a0"></span><span class="dim">Disconnected · nothing answered on 127.0.0.1:8000 or :8188</span><span style="flex:1"></span><span class="btn">Retry</span><span class="btn ghost">Settings</span></div>
+    <div class="bar"><span class="seg"><span class="on">Run</span><span>Graph</span></span><span class="sel">Desktop ▾</span><span class="dot" style="background:#e5484d"></span><span class="dim">Not connected · Comfy Desktop is installed but has no local ComfyUI yet (tried 127.0.0.1:8000, 127.0.0.1:8188)</span><span style="flex:1"></span><span class="btn">Retry</span><span class="btn ghost">Settings</span></div>
     <div style="padding:28px;display:grid;place-items:center">
       <div class="card" style="max-width:520px;padding:20px 22px">
         <div style="display:flex;gap:12px;align-items:center;margin-bottom:8px"><img src="{{img:comfy-icon.png}}" alt="" style="width:32px;height:32px;border-radius:8px"><b style="font-size:17px">Connect Comfy</b></div>
-        <p class="dim" style="margin:0 0 14px">Run workflows on your own GPU with Comfy Desktop, or on Comfy Cloud from any laptop.</p>
-        <div style="display:flex;gap:8px;flex-wrap:wrap"><span class="btn primary">Use Comfy Cloud</span><span class="btn">Download Comfy Desktop</span><span class="btn ghost">Connect to a URL…</span></div>
+        <p style="margin:0 0 6px">Comfy Desktop is installed, but it only has Comfy Cloud. Add a local ComfyUI in Comfy Desktop to run on your own GPU, or use Comfy Cloud here.</p>
+        <p class="dim" style="margin:0 0 14px;font-size:12px">Comfy Desktop is installed but has no local ComfyUI yet (tried 127.0.0.1:8000, 127.0.0.1:8188).</p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap"><span class="btn primary">Use Comfy Cloud</span><span class="btn">Get Comfy Desktop</span><span class="btn ghost">Connect to a URL…</span></div>
       </div>
     </div>
   </div>
@@ -370,8 +372,9 @@ svg.diagram{width:100%;height:auto;display:block}
       <li><b>Run.</b> The big blue button at the bottom, with a batch count beside it. Each run appears in the result strip with a progress bar; the status line counts running jobs.</li>
       <li><b>Look.</b> The finished texture fills the preview. Click other results in the strip to compare.</li>
       <li><b>Use it.</b> <b>Replace on selection</b> builds <code>T_…_D</code>, a derived <code>T_…_N</code> and an <code>MI_…</code>, and puts the material on every mesh slot of the selected actors. <b>Revert</b> puts the old materials back and keeps the assets. Ctrl+Z works too.</li>
+      <li><b>Come back to it.</b> <b>Project runs</b>, at the bottom of the left column, lists this project's runs newest first, with a thumbnail and when each ran. Hover one to see its inputs. Open it to see the result again, with its workflow and inputs back in the form, ready to run again or change.</li>
     </ol>
-    <div class="today">Today: built in the new Run view (package compiled, screenshot pending an editor restart). Import is automatic by default; turn it off under "In Unreal" to only import what you keep.</div>
+    <div class="today">Today: built and tested on Comfy Cloud on October 25, through the sign-in: <i>mossy dark cobblestone path</i> and <i>a Brooklyn-inspired red brick wall with vines</i>, each imported as a texture, a derived normal map and a material. Credits in the status line went from 1,751 to 1,749. Import is automatic by default; turn it off under "In Unreal" to only import what you keep.</div>
   </div>
 
   <div class="mock" role="img" aria-label="Mockup: the Run view with a texture result">
@@ -401,13 +404,18 @@ svg.diagram{width:100%;height:auto;display:block}
   </div>
   <p class="small muted" style="margin-top:-6px">Mockup of the Run view as built in commit <code>350a43d</code>, drawn with the same tokens. The texture is a placeholder pattern.</p>
 
+  <figure>
+    <img src="{{img:run-cloud.jpg}}" alt="Comfy Studio's Run view after a Comfy Cloud run: a red brick wall with vines in the preview, two results in the strip, and Project runs at the bottom of the left column">
+    <figcaption>The Run view on October 25: a texture made on Comfy Cloud through the sign-in, with no API key. The status line shows the account and its credits, and <b>Project runs</b> sits under the Run bar.</figcaption>
+  </figure>
+
   <!-- J3 -->
   <div class="journey" id="j-selection">
     <h4>3. Start from what's in the level <span class="chip built">built</span></h4>
     <div class="who">Artist restyling existing content. Goal: use a texture, mesh or the viewport as the input without exporting anything by hand.</div>
     <ol class="steps">
-      <li><b>Pick a workflow with an image input</b>, such as Image to Mesh or a restyle workflow.</li>
-      <li><b>Fill the drop zone</b> one of four ways: drag a texture from the Content Browser, drag a file from Explorer, press <b>Use selection</b>, or press <b>Viewport</b> to capture the active view.</li>
+      <li><b>Pick a workflow with an image input.</b> For example, Image to Mesh or a restyle workflow.</li>
+      <li><b>Fill the drop zone.</b> There are four ways: drag a texture from the Content Browser, drag a file from Explorer, press <b>Use selection</b>, or press <b>Viewport</b> to capture the active view.</li>
       <li><b>Run.</b> Studio writes textures to <code>Saved/Comfy/Inputs</code> as PNG and uploads them; meshes and sounds go as the file they were imported from.</li>
     </ol>
     <div class="today">Today: built. Viewport capture is the beauty pass only; depth and normal passes for ControlNet-style workflows are on the roadmap.</div>
@@ -418,7 +426,7 @@ svg.diagram{width:100%;height:auto;display:block}
     <h4>4. Author a workflow for the team <span class="chip partial">partial</span></h4>
     <div class="who">Technical artist. Goal: turn a ComfyUI graph into a one-screen form the whole team can use, with outputs that import correctly.</div>
     <ol class="steps">
-      <li><b>Build the graph in ComfyUI</b>, either in Studio's Graph view (the real ComfyUI frontend, inside Unreal) or in Comfy Desktop.</li>
+      <li><b>Build the graph in ComfyUI.</b> Use Studio's Graph view (the real ComfyUI frontend, inside Unreal) or in Comfy Desktop.</li>
       <li><b>Expose inputs.</b> Right-click a node › <i>Comfy for Unreal › Expose input to Unreal</i>. Pick the widget, give it a label and say where the value comes from: the form, the main prompt, selected textures or meshes, or a viewport capture.</li>
       <li><b>Tag outputs.</b> On a save node, <i>Tag output for Unreal</i>: a Texture with its slot (Base Color, Normal, Roughness, Metallic, AO, Height, ORM, Emissive, Opacity), or an Image, Sound, Music or Mesh. Tagged nodes show a small <b>UE</b> badge.</li>
       <li><b>Send to Unreal.</b> The action bar button opens a dialog: name, type, description, group and a thumbnail from the last result. The workflow is saved on the ComfyUI server and, inside Studio, lands as a Comfy Workflow asset in <code>/Game/Comfy/Workflows</code>.</li>
@@ -437,12 +445,12 @@ svg.diagram{width:100%;height:auto;display:block}
     <h4>5. Switch between my GPU and the cloud <span class="chip built">built</span></h4>
     <div class="who">Anyone. Goal: the same workflow runs locally or on Comfy Cloud without editing it.</div>
     <ol class="steps">
-      <li><b>Pick a backend</b> in the status line: Desktop, Comfy Cloud, or a deployment the studio set up.</li>
-      <li><b>Studio checks it</b> and the dot shows Connecting, then Connected or Failed with the reason (no key, out of credits, unreachable).</li>
-      <li><b>Model dropdowns refill</b> from that backend's model list, and each picks the workflow's preferred file again. A workflow that wants <code>flux_vae</code> never silently gets a 4-channel VAE that happens to be named <code>ae.safetensors</code>.</li>
-      <li><b>Credits are visible.</b> Runs that spend Comfy credits say so before you press Run.</li>
+      <li><b>Pick a backend.</b> The picker is in the status line: Desktop, Comfy Cloud, or a deployment the studio set up.</li>
+      <li><b>Studio checks it.</b> The dot shows Connecting, then Connected or Failed with the reason (no key, out of credits, unreachable).</li>
+      <li><b>Model dropdowns refill.</b> They read that backend's model list, and each picks the workflow's preferred file again. A workflow that wants <code>flux_vae</code> never silently gets a 4-channel VAE that happens to be named <code>ae.safetensors</code>.</li>
+      <li><b>Credits are visible.</b> On Cloud the status line shows the account's free runs or credits, read again a few seconds after every run. <span class="chip todo">to build</span> The cost of a run before you press Run.</li>
     </ol>
-    <div class="today">Today: switching is built. On Cloud, Run and the model list need an API key; with the page bridge they will use the Graph view's sign-in instead.</div>
+    <div class="today">Today: switching is built. On Cloud, Run and the model list use the Graph view's sign-in when there's no API key, or when the key is refused.</div>
   </div>
 
   <!-- J6 -->
@@ -450,10 +458,10 @@ svg.diagram{width:100%;height:auto;display:block}
     <h4>6. Let an agent do it <span class="chip built">built</span></h4>
     <div class="who">A developer driving the editor through Unreal MCP. Goal: one call from intent to assigned asset, with consent before spending.</div>
     <ol class="steps">
-      <li><b>The agent discovers the toolset:</b> <code>list_toolsets</code> shows <code>ComfyAgent.ComfyToolset</code> with 18 tools.</li>
-      <li><b>One call:</b> <code>GenerateMaterial(prompt: "weathered red brick", bAssignToSelection: true)</code> runs a texture workflow, waits, builds the material and assigns it.</li>
-      <li><b>Consent:</b> if the run spends credits, the tool refuses with a message telling the agent to ask the user, then retry with <code>bAllowCreditSpend</code>.</li>
-      <li><b>Show the user:</b> <code>OpenStudio("Run")</code> brings the panel up with the result in the gallery.</li>
+      <li><b>The agent discovers the toolset.</b> <code>list_toolsets</code> shows <code>ComfyAgent.ComfyToolset</code> with 18 tools.</li>
+      <li><b>One call.</b> <code>GenerateMaterial(prompt: "weathered red brick", bAssignToSelection: true)</code> runs a texture workflow, waits, builds the material and assigns it.</li>
+      <li><b>Consent.</b> If the run spends credits, the tool refuses with a message telling the agent to ask the user, then retry with <code>bAllowCreditSpend</code>.</li>
+      <li><b>Show the user.</b> <code>OpenStudio("Run")</code> brings the panel up with the result in the gallery.</li>
     </ol>
   </div>
 
@@ -464,10 +472,11 @@ svg.diagram{width:100%;height:auto;display:block}
     <div class="tbl"><table>
       <thead><tr><th>What happens</th><th>What the user sees</th><th>Next step offered</th></tr></thead>
       <tbody>
-        <tr><td>ComfyUI isn't running</td><td>Red dot, "Connection failed · couldn't connect to 127.0.0.1:8188"</td><td>Retry; Settings. <span class="chip todo">to build</span> Launch Comfy Desktop.</td></tr>
-        <tr><td>Cloud, not signed in and no key</td><td>Today: a red "No API key" message, even while the Graph view is signed in</td><td><span class="chip todo">to build</span> "Sign in to Comfy Cloud" opens the sign-in page; "Use an API key instead" opens the key steps.</td></tr>
-        <tr><td>API key refused (401)</td><td>"The API key was refused" with where keys are read from</td><td>Settings. <span class="chip todo">to build</span> Fall back to the signed-in page if there is one.</td></tr>
-        <tr><td>Free runs used up</td><td>Cloud's "0 / 5 runs left"</td><td><span class="chip todo">to build</span> Show the count in the status line before Run; link to Upgrade.</td></tr>
+        <tr><td>ComfyUI isn't running</td><td>The "Connect Comfy" welcome card, worded from what Comfy Desktop has installed, and the ports tried</td><td><span class="chip built">built</span> Use Comfy Cloud; Get Comfy Desktop; Connect to a URL; Retry in the status line. <span class="chip todo">to build</span> Launch Comfy Desktop.</td></tr>
+        <tr><td>Cloud, not signed in and no key</td><td>"Sign in to Comfy Cloud" card; the status dot is blue, not red</td><td><span class="chip built">built</span> Sign in (opens the Graph view); Use an API key instead; Use Comfy Desktop instead.</td></tr>
+        <tr><td>API key refused (401/403)</td><td>"Comfy Cloud refused your API key", naming where it came from: an environment variable (change or remove it and restart Unreal) or Editor Preferences. The server's own message is in the tooltip.</td><td><span class="chip built">built</span> Sign in instead; Replace key and Remove key (Editor Preferences); Get a new key. Once signed in, Studio skips the refused key and runs with the sign-in, with a one-line notice.</td></tr>
+        <tr><td>Free runs used up</td><td>The status line shows free runs left, or credits</td><td><span class="chip partial">count built</span> <span class="chip todo">to build</span> Link to Upgrade when it reaches 0.</td></tr>
+        <tr><td>Backend unreachable</td><td>Run is disabled, with a tooltip that points at the status line; other errors are a one-line red notice above the library</td><td><span class="chip built">built</span> Settings; Retry in the status line.</td></tr>
         <tr><td>Out of credits (402)</td><td>"Out of credits. Add credits at platform.comfy.org"</td><td><span class="chip todo">to build</span> Open billing.</td></tr>
         <tr><td>Workflow needs missing nodes</td><td>Warning above the form listing the node classes</td><td><span class="chip todo">to build</span> Install with ComfyUI Manager, or switch to Cloud.</td></tr>
         <tr><td>Model file missing</td><td>The run fails in ComfyUI with its error</td><td><span class="chip todo">to build</span> A model check before Run, with a download offer (RTX Remix ships a download node for this).</td></tr>
@@ -484,26 +493,28 @@ svg.diagram{width:100%;height:auto;display:block}
   <p class="lede">One tab, a slim status line, two views. The Run view borrows ComfyUI App mode's layout; the Graph view is ComfyUI itself.</p>
 
   <h3 id="status-line">Status line</h3>
-  <p>Always visible, one row: the <b>Run | Graph</b> switch, the backend picker, a connection dot with a short summary (Disconnected, Connecting, Connected, Connection failed), a running-jobs count, <b>Check</b> or <b>Retry</b>, and <b>Settings</b>.</p>
+  <p>Always visible, one row: the <b>Run | Graph</b> switch, the backend picker, a connection dot with a short summary, a running-jobs count, <b>Check</b> or <b>Retry</b>, and <b>Settings</b>. The dot is green when connected, blue while connecting or waiting for a Cloud sign-in, and red when not connected. On Cloud the summary is the account: <i>Signed in as Joshua Jones · 1,751 credits</i>. The tooltip holds the whole line and the server's own words.</p>
 
   <h3 id="run-view">Run view</h3>
   <div class="tbl"><table>
     <thead><tr><th>Area</th><th>Contents</th><th>State</th></tr></thead>
     <tbody>
       <tr><td class="k">Workflow picker</td><td>Name with type and origin (Project, Server, Built-in). The menu groups by origin, then type.</td><td><span class="chip built">built</span> Thumbnails <span class="chip todo">to build</span></td></tr>
-      <tr><td class="k">Input cards</td><td>One rounded card per exposed input. A tall prompt box; image drop zones; seed with Randomize; model and choice dropdowns; number fields.</td><td><span class="chip built">built</span> Sliders with ranges <span class="chip todo">to build</span></td></tr>
-      <tr><td class="k">In Unreal</td><td>Auto-import, make a material from images, tileable with derived normal, destination folder.</td><td><span class="chip built">built</span></td></tr>
-      <tr><td class="k">Run bar</td><td>Batch count and a large blue Run button, pinned to the bottom of the column.</td><td><span class="chip built">built</span></td></tr>
+      <tr><td class="k">Input cards</td><td>One rounded card per input of the chosen workflow, built from its manifest or detected from the graph (see <a href="#form-from-workflow">section 7</a>). A tall prompt box; image drop zones; seed with Randomize; model and choice dropdowns; number fields. Before a workflow is chosen, the column shows a one-line hint and nothing else.</td><td><span class="chip built">built</span> Sliders with ranges <span class="chip todo">to build</span></td></tr>
+      <tr><td class="k">In Unreal</td><td>Auto-import, make a material from images, tileable with derived normal, destination folder. Shown once a workflow is chosen.</td><td><span class="chip built">built</span></td></tr>
+      <tr><td class="k">Run bar</td><td>A labelled <b>Batch</b> count and a large blue Run button, pinned to the bottom of the column. Run is disabled, and looks it, while the backend is unreachable.</td><td><span class="chip built">built</span></td></tr>
+      <tr><td class="k">Project runs</td><td>A dropdown under the Run bar: this project's runs, newest first, with thumbnail, title, time and state. The tooltip lists the inputs. Opening one shows its result and puts its workflow and inputs back in the form. Each run is kept as <code>job.json</code> beside its outputs in <code>Saved/Comfy/Jobs</code>, so the list survives restarts and stays on the user's machine.</td><td><span class="chip built">built</span></td></tr>
+      <tr><td class="k">Welcome card and notices</td><td>Above the library when the backend needs something: a card for first-run paths (connect, sign in, refused key), a one-line notice for everything else.</td><td><span class="chip built">built</span></td></tr>
       <tr><td class="k">Gallery</td><td>Large preview of the selected result, actions, then a strip of results and in-flight jobs with progress.</td><td><span class="chip built">built</span> Audio and mesh previews <span class="chip todo">to build</span></td></tr>
       <tr><td class="k">Actions</td><td>Import, Replace on selection, Revert, Show in Content Browser, Open in Graph.</td><td><span class="chip built">built</span></td></tr>
-      <tr><td class="k">Empty state</td><td>"What do you want to make?" with workflow cards grouped by type.</td><td><span class="chip built">built</span></td></tr>
+      <tr><td class="k">Empty state</td><td>"What do you want to make?" with workflow cards grouped by type. Each card has a one-line title and a two-line description; a workflow sent without a description lists its inputs instead.</td><td><span class="chip built">built</span></td></tr>
     </tbody>
   </table></div>
 
   <div class="mock" role="img" aria-label="Mockup: the empty state with workflow cards by type">
-    <div class="bar"><span class="seg"><span class="on">Run</span><span>Graph</span></span><span class="sel">Comfy Cloud ▾</span><span class="dot"></span><span class="dim">Connected · Comfy API v2 at cloud.comfy.org</span><span style="flex:1"></span><span class="btn">Check</span></div>
+    <div class="bar"><span class="seg"><span class="on">Run</span><span>Graph</span></span><span class="sel">Comfy Cloud ▾</span><span class="dot"></span><span class="dim">Connected · Signed in as Joshua Jones · 1,751 credits</span><span style="flex:1"></span><span class="btn">Check</span></div>
     <div class="body">
-      <div class="left"><div class="picker"><img src="{{img:comfy-icon.png}}" alt=""><div><b>Choose a workflow</b><div class="dim" style="font-size:12px">5 available</div></div></div><div class="runbar"><div class="field n">1</div><span class="btn primary" style="opacity:.4">Run</span></div></div>
+      <div class="left"><div class="picker"><img src="{{img:comfy-icon.png}}" alt=""><div><b>Choose a workflow</b><div class="dim" style="font-size:12px">6 available</div></div></div><div class="dim" style="font-size:12px;padding:2px 2px 0">Choose a workflow above or from the library. Its inputs appear here.</div><div class="picker" style="margin-top:auto"><div style="flex:1"><b>Project runs</b><div class="dim" style="font-size:12px">2 runs · last just now</div></div><span class="dim">▾</span></div></div>
       <div class="main">
         <b style="font-size:17px">What do you want to make?</b>
         <div class="dim">Pick a workflow. Send your own from the Graph view, or from ComfyUI with the Comfy for Unreal extension.</div>
@@ -521,9 +532,15 @@ svg.diagram{width:100%;height:auto;display:block}
     </div>
   </div>
 
+  <figure>
+    <img src="{{img:run-library.jpg}}" alt="The Run view's library on Comfy Cloud, signed in, with a one-line notice that the API key in COMFY_API_KEY was refused and isn't used">
+    <figcaption>The library on October 25. The old key in <code>COMFY_API_KEY</code> was refused, so Studio runs with the sign-in and says so in one line instead of blocking.</figcaption>
+  </figure>
+
   <h3 id="graph-view">Graph view</h3>
   <p>The active backend's ComfyUI frontend in Unreal's embedded browser (Chromium 128 through CEF): the local server's address, or <code>cloud.comfy.org</code> for Comfy Cloud. Sign-ins persist in <code>Saved/Comfy/Browser</code>, and sign-in popups open in their own window so Google and GitHub logins work.</p>
   <p>A thin toolbar above the page offers <b>Send to Unreal</b>, <b>Open in Graph</b> (the workflow selected in Run), <b>Reload</b> and <b>Open in browser</b>. With the extension installed, ComfyUI's own action bar gets the richer Send dialog and the toolbar button becomes redundant.</p>
+  <p>On Comfy Cloud the page loads in the background as soon as Cloud is the active backend, even while the Run view shows, because Cloud runs without a key go through it. See <a href="#cloud-sign-in">Signing in to Comfy Cloud</a>.</p>
   <div class="gallery">
     <figure><img src="{{img:graph-cloud.jpg}}" alt="Comfy Cloud sign-in page inside Comfy Studio"><figcaption>Comfy Cloud's sign-in, inside the editor.</figcaption></figure>
     <figure><img src="{{img:graph-desktop.jpg}}" alt="Graph view with ComfyUI not running"><figcaption>The Desktop backend with ComfyUI stopped: the page error is honest but plain. A friendlier empty state is on the list.</figcaption></figure>
@@ -593,19 +610,27 @@ svg.diagram{width:100%;height:auto;display:block}
       <tr><td>Mesh</td><td>Static Mesh</td><td>GLB through Interchange</td></tr>
     </tbody>
   </table></div>
+  <h3 id="form-from-workflow">The form comes from the workflow</h3>
+  <p>Nothing in the Run view's form is fixed except the "In Unreal" card and the Run bar. Each input card comes from the chosen workflow, in one of two ways:</p>
+  <ol>
+    <li><b>From the manifest.</b> Built-ins and workflows sent with the extension list their inputs: label, type, node, widget, tooltip, prefer list. The Cloud texture's <i>Surface</i> card is node 10's <code>string_b</code>, renamed by its manifest.</li>
+    <li><b>Detected from an Export (API) file.</b> Load Image, Audio and Video nodes become drop zones; Save and Preview nodes become outputs. Widgets with well-known names become cards: text and prompt fields, seed, steps, cfg, denoise, width, height, batch size, seconds, duration, length, and the checkpoint, UNet and LoRA loaders as model dropdowns. A node's title becomes the card's label, so titling nodes in ComfyUI gives a cleaner form.</li>
+  </ol>
+  <p>Detection uses a fixed list of names. Widgets outside it, such as <code>sampler_name</code>, <code>scheduler</code>, <code>guidance</code> or a custom node's own fields, stay as saved in the graph. To put them in the form, expose them with the extension. The canvas save format is refused with a message that asks for Export (API).</p>
   <h3 id="model-inputs">Model inputs that travel</h3>
   <p>Model files differ between machines and Cloud. A <code>Model</code> input lists what the connected backend has and picks the first match from the workflow's <code>prefer</code> list (exact name first, then substring). That fixed a real failure on the test PC, where <code>ae.safetensors</code> turned out to be an SDXL VAE.</p>
   <h3 id="built-ins">Built-in workflows</h3>
   <div class="tbl"><table>
     <thead><tr><th>Workflow</th><th>Type</th><th>Runs on</th><th>State</th></tr></thead>
     <tbody>
-      <tr><td>Seamless Texture (Cloud)</td><td>Texture</td><td>Cloud, any install with a Flux fp8 checkpoint</td><td><span class="chip partial">untested on Cloud</span></td></tr>
+      <tr><td>Seamless Texture (Cloud)</td><td>Texture</td><td>Cloud, any install with a Flux fp8 checkpoint</td><td><span class="chip built">ran on Cloud</span></td></tr>
       <tr><td>Seamless Texture (Flux Dev GGUF)</td><td>Texture</td><td>Local, 12-16 GB GPU</td><td><span class="chip built">ran locally</span></td></tr>
       <tr><td>Seamless Texture (Flux Schnell)</td><td>Texture</td><td>Local with the fp8 checkpoint</td><td><span class="chip partial">untested</span></td></tr>
       <tr><td>Sound Effect (Stable Audio Open)</td><td>Sound</td><td>Local, Cloud</td><td><span class="chip partial">models not on test PC</span></td></tr>
       <tr><td>Image to Mesh (Hunyuan3D 2)</td><td>Mesh</td><td>Local, about 12 GB</td><td><span class="chip partial">models not on test PC</span></td></tr>
     </tbody>
   </table></div>
+  <p><b>Next: starter templates.</b> Three Seamless Texture variants is one too many. The built-ins become one generic template per job, made from core nodes so the same file runs on Comfy Cloud and on Desktop. <code>docs/design/templates-investigation.md</code> proposes seven: Seamless Texture and Texture Restyle (FLUX.2 Klein 4B), Texture Upscale (RealESRGAN), Sound Effect (Stable Audio), Music (ACE-Step 1.5), Image to Mesh (TRELLIS.2), and a partner-node Game Asset (Tripo). Each workflow is a starting point; the plugin is the sandbox.</p>
 </section>
 
 <!-- ============================================================ 8 -->
@@ -622,11 +647,13 @@ svg.diagram{width:100%;height:auto;display:block}
       <tr><td class="k">Comfy Router</td><td>Single partner-model calls</td><td>No</td><td>No</td><td>Credits</td></tr>
     </tbody>
   </table></div>
-  <p class="small muted">API keys are read from the profile's environment variable (<code>COMFY_API_KEY</code>), then <code>COMFY_CLOUD_API_KEY</code> (comfy-cli's), then Editor Preferences. Cloud and Router use <code>Authorization: Bearer</code>, the same as Comfy's own SDK.</p>
+  <p class="small muted">API keys are read from the profile's environment variable (<code>COMFY_API_KEY</code>), then <code>COMFY_CLOUD_API_KEY</code> (comfy-cli's), then the session, then Editor Preferences. Cloud and Router use <code>Authorization: Bearer</code>, the same as Comfy's own SDK. A key the server refuses (401 or 403) is remembered by its hash and skipped until it changes; Cloud then runs with the sign-in.</p>
 
   <h3 id="cloud-sign-in">Signing in to Comfy Cloud</h3>
   <p>The first Cloud test showed a gap. With no key, the Graph view opened Comfy's sign-in. After sign-in the page was ready to run, with 5 free runs, but Run in Studio still refused because it only knew about API keys. Users should not have to sign in and also make a key.</p>
-  <p><b>Proposal: run Cloud jobs through the signed-in page.</b> The ComfyUI frontend exposes its API client as <code>window.comfyAPI</code>. Every call it makes, including <code>queuePrompt</code>, goes through <code>api.fetchApi</code>, which carries the page's Cloud session and refreshes it when it expires (<code>fetchWithUnifiedRemint</code> in frontend 1.53). Studio already has a two-way bridge into the page (<code>window.ue.comfyunreal</code>). So for a signed-in Cloud backend, Studio:</p>
+  <div class="callout"><p><b>Built and tested on October 25.</b> Studio injects a small bridge script, <code>Resources/Bridge/comfy_unreal_page.js</code>, after every page load. It reports the account to Unreal and runs Unreal's calls with the page's own sign-in: <code>objectInfo</code>, <code>upload</code>, <code>queue</code>, <code>status</code> (the jobs API), <code>fetch</code> and <code>cancel</code>. In Unreal, <code>FComfyPageBackend</code> is a normal backend that sends those calls through the page, so jobs, progress, downloads and import work exactly as with a key. Two textures ran this way with no key.</p></div>
+  <p><b>The account in the status line.</b> The bridge reads the signed-in user from the frontend's account store, free runs from <code>/api/features</code> (<code>free_tier_balance</code>), and credits from <code>/billing/balance</code>, falling back to the account's own balance on older billing. Both report US cents, even in the fields named <code>*_micros</code>; credits are cents ÷ 100 × 211, rounded as Cloud shows them. It reads again after every run, every minute and when the window gets focus.</p>
+  <p><b>The design, as proposed:</b> The ComfyUI frontend exposes its API client as <code>window.comfyAPI</code>. Every call it makes, including <code>queuePrompt</code>, goes through <code>api.fetchApi</code>, which carries the page's Cloud session and refreshes it when it expires (<code>fetchWithUnifiedRemint</code> in frontend 1.53). Studio already has a two-way bridge into the page (<code>window.ue.comfyunreal</code>). So for a signed-in Cloud backend, Studio:</p>
   <ol>
     <li>keeps the Graph page loaded, even while the Run view is showing;</li>
     <li>uploads inputs by calling <code>/upload/image</code> from inside the page;</li>
@@ -644,14 +671,14 @@ svg.diagram{width:100%;height:auto;display:block}
       <tr><td class="k">Risks</td><td>Depends on frontend internals (<code>comfyAPI</code>, event names); must be checked against each Cloud frontend release</td><td>Keys on disk or in env; user has to manage them</td></tr>
     </tbody>
   </table></div>
-  <p>Both stay. Studio uses the key if it has one and falls back to the signed-in page otherwise. The status line names which one is in use: <i>Signed in · Joshua</i> or <i>API key · ends 4f2a</i>.</p>
+  <p>Both stay. Studio uses the key if it has one and it works, and the signed-in page otherwise. With the page, the status line names the account: <i>Signed in as Joshua Jones · 1,751 credits</i>. A refused key gets a one-line notice instead of blocking runs.</p>
   <h4 id="api-key-steps">When a key is needed: the walkthrough</h4>
   <p>Settings › Comfy Cloud shows these steps inline, with buttons rather than instructions:</p>
   <ol class="steps">
     <li><b>Open the key page.</b> A button opens <code>platform.comfy.org</code> to the API keys page, inside the same signed-in browser so there's no second login.</li>
-    <li><b>Create a key</b> named after the machine, for example "Unreal · studio-pc".</li>
-    <li><b>Paste it</b> into a password field in Settings. It is stored in the user's Editor Preferences, never in the project. A <b>Test</b> button checks it and shows the account it belongs to.</li>
-    <li><b>Or use a variable</b> for shared or build machines: <code>COMFY_API_KEY</code>, read when the editor starts.</li>
+    <li><b>Create a key.</b> Name it after the machine, for example "Unreal · studio-pc".</li>
+    <li><b>Paste it.</b> Settings has a password field for it. It is stored in the user's Editor Preferences, never in the project. A <b>Test</b> button checks it and shows the account it belongs to.</li>
+    <li><b>Or use a variable.</b> For shared or build machines: <code>COMFY_API_KEY</code>, read when the editor starts.</li>
   </ol>
   <div class="callout warn"><p><b>Ask Comfy Cloud first.</b> The page bridge uses the frontend the way a person does, but programmatically. Confirm with the Cloud team that it fits their terms and rate limits, and whether a supported route is coming, for example an OAuth or device-code sign-in that gives Unreal its own token.</p></div>
 </section>
@@ -688,7 +715,8 @@ svg.diagram{width:100%;height:auto;display:block}
     <thead><tr><th>Element</th><th>Rule</th></tr></thead>
     <tbody>
       <tr><td class="k">Radius</td><td>8 px for cards and buttons (radius-lg), 12 px for drop zones and the preview (radius-xl).</td></tr>
-      <tr><td class="k">Type</td><td>The frontend uses Inter; Slate uses the editor's Roboto, the closest bundled face. Labels are small caps in secondary text, like App mode's.</td></tr>
+      <tr><td class="k">Type</td><td>The frontend uses Inter; Slate uses the editor's Roboto, the closest bundled face. Plain Roboto Regular and Bold, not the editor's condensed heading face: body 10 pt, secondary 9, labels 8 bold in caps, card titles 11 bold, headings 15 bold.</td></tr>
+      <tr><td class="k">Disabled</td><td>A flat card with muted text and a hairline, never a faded blue: a disabled Run must not look almost pressable.</td></tr>
       <tr><td class="k">Primary action</td><td>One blue button per view: Run, or Import in the gallery.</td></tr>
       <tr><td class="k">Logo</td><td>The yellow Comfy mark on the toolbar button, Tools menu, tab and workflow asset thumbnails, from the frontend's <code>comfy-icon-512.png</code>. Use needs confirming with Comfy Org brand.</td></tr>
       <tr><td class="k">Naming</td><td>"Comfy for Unreal" is the product; "Comfy Studio" is the tab; "Run" and "Graph" are its views.</td></tr>
@@ -700,24 +728,26 @@ svg.diagram{width:100%;height:auto;display:block}
 <section class="doc" id="state">
   <div class="sec-num">11</div>
   <h2>Where it stands</h2>
-  <p class="lede">A working proof of concept on UE 5.8, built and tested on one PC between October 22 and 24.</p>
+  <p class="lede">A working proof of concept on UE 5.8, built and tested on one PC between October 22 and 25.</p>
   <div class="tbl"><table>
     <thead><tr><th>Area</th><th>State</th><th>Notes</th></tr></thead>
     <tbody>
       <tr><td class="k">Plugin build</td><td><span class="chip built">built</span></td><td>Editor and game targets package with RunUAT BuildPlugin, no warnings.</td></tr>
       <tr><td class="k">Graph view and Send to Unreal</td><td><span class="chip built">tested</span></td><td>A real 18-input workflow sent and run.</td></tr>
       <tr><td class="k">Local generation</td><td><span class="chip built">tested</span></td><td>Flux Dev GGUF texture on the portable install.</td></tr>
-      <tr><td class="k">New Run view</td><td><span class="chip partial">built, not seen</span></td><td>Compiled; needs an editor restart to screenshot.</td></tr>
+      <tr><td class="k">Run view</td><td><span class="chip built">tested</span></td><td>Welcome card, notices, library, form, gallery and Project runs reviewed on screen; a UX pass fixed type, cards, the left column and disabled states.</td></tr>
+      <tr><td class="k">First run</td><td><span class="chip built">tested</span></td><td>Finds a local ComfyUI on the configured port, Desktop's ports, 8000 and 8188; explains what Comfy Desktop has when none answers.</td></tr>
       <tr><td class="k">ComfyUI extension</td><td><span class="chip partial">built, not loaded</span></td><td>Loads on the next ComfyUI restart.</td></tr>
-      <tr><td class="k">Comfy Cloud</td><td><span class="chip partial">signed in, can't run</span></td><td>Sign-in works in the Graph view. Run needs an API key (the old one returns 401) until the page bridge exists.</td></tr>
+      <tr><td class="k">Comfy Cloud</td><td><span class="chip built">tested</span></td><td>Runs through the sign-in with no key; the refused old key is skipped. Credits shown and updated after runs (1,751 → 1,749 for one texture).</td></tr>
+      <tr><td class="k">Run history</td><td><span class="chip built">tested</span></td><td>Runs kept in <code>Saved/Comfy/Jobs</code> and listed under Project runs.</td></tr>
       <tr><td class="k">Tests</td><td><span class="chip todo">to build</span></td><td>Mock-backend automation tests.</td></tr>
     </tbody>
   </table></div>
-  <figure>
-    <img src="{{img:run-v1.jpg}}" alt="The first Comfy Studio Run view">
-    <figcaption>The first Run view (October 24, morning), before the App-mode redesign. Kept for comparison.</figcaption>
-  </figure>
-  <p class="small muted">Repositories (local, not yet pushed): <code>D:\Comfy\comfy-unreal</code> (plugin, latest <code>350a43d</code>) and <code>D:\Comfy\comfy-for-unreal</code> (extension, <code>66b829a</code>).</p>
+  <div class="gallery">
+    <figure><img src="{{img:run-v1.jpg}}" alt="The first Comfy Studio Run view"><figcaption>October 24, morning: the first Run view, before the App-mode redesign.</figcaption></figure>
+    <figure><img src="{{img:run-cloud.jpg}}" alt="The Run view on October 25 after a Comfy Cloud run"><figcaption>October 25: the App-mode Run view after a Cloud run through the sign-in.</figcaption></figure>
+  </div>
+  <p class="small muted">Repositories (local, not yet pushed): <code>D:\Comfy\comfy-unreal</code> (plugin, latest <code>20e930e</code>) and <code>D:\Comfy\comfy-for-unreal</code> (extension, <code>66b829a</code>).</p>
 </section>
 
 <!-- ============================================================ 12 -->
@@ -727,8 +757,9 @@ svg.diagram{width:100%;height:auto;display:block}
   <div class="tbl"><table>
     <thead><tr><th>When</th><th>Milestone</th><th>Scope</th></tr></thead>
     <tbody>
-      <tr><td class="k">Oct 25 – 31</td><td>Verify and polish</td><td>Screenshot and review the Run view; test the extension in ComfyUI; first-run welcome card and Desktop auto-detection; a friendlier Graph empty state; the Cloud page bridge and a first Cloud run from the Run view; the API key walkthrough in Settings.</td></tr>
-      <tr><td class="k">Nov 1 – 7</td><td>Jam-ready content</td><td>Six tagged workflows tested on Desktop and Cloud (material, restyle, sprite, sound variations, music, prop mesh); model checks and download offers; sample project.</td></tr>
+      <tr><td class="k">Oct 25 – 31</td><td>Verify and polish</td><td><s>Review the Run view; first-run welcome card and Desktop auto-detection; the Cloud page bridge and a first Cloud run; credits in the status line; run history.</s> Done October 25. Next: a Cloud save bridge, so workflows and results made in the Cloud page can be saved into the project the way the extension does locally (inject the extension's frontend into the Cloud page); test the extension in ComfyUI; a friendlier Graph empty state; the API key walkthrough in Settings; continue the UX walkthrough from Journey 2.</td></tr>
+      <tr><td class="k">Oct 28 – Nov 4</td><td>Starter templates</td><td>Replace the built-ins with the generic, core-node templates from <code>templates-investigation.md</code>, each tested on Desktop and Cloud.</td></tr>
+      <tr><td class="k">Nov 1 – 7</td><td>Jam-ready content</td><td>Model checks and download offers; run cost before Run; a sample project.</td></tr>
       <tr><td class="k">Nov 8 – 11</td><td>Beta</td><td>GitHub release of plugin and extension; docs and a five-minute video; jam credits for Cloud.</td></tr>
       <tr><td class="k">Nov 12 on</td><td>The jam</td><td>Support channel, daily fixes, a friction log from entrants.</td></tr>
       <tr><td class="k">December</td><td>v1.0</td><td>Fab listing, ComfyUI Manager listing, macOS and Linux, Sequencer and Movie Render Queue passes.</td></tr>
@@ -743,14 +774,15 @@ svg.diagram{width:100%;height:auto;display:block}
   <p class="lede">For the UI review and the UX walkthrough.</p>
   <ol>
     <li><b>Auto-import or keep?</b> Should results import automatically (today's default), or only when the user presses Import or Replace? Auto-import fills the Content Browser fast during exploration.</li>
-    <li><b>Where does onboarding live?</b> A welcome card in the empty state, a first-run modal, or a Comfy section in the editor's own startup?</li>
-    <li><b>Cloud sign-in vs. API key.</b> Technically yes, through the <a href="#cloud-sign-in">page bridge</a>. Open: does the Cloud team bless it, or is a supported sign-in for third-party apps coming?</li>
+    <li><b>Where does onboarding live?</b> <i>Answered October 25: a welcome card in the Run view, which is where Studio opens.</i></li>
+    <li><b>Cloud sign-in vs. API key.</b> Built and working through the <a href="#cloud-sign-in">page bridge</a>. Still open: does the Cloud team bless it, or is a supported sign-in for third-party apps coming? The bridge also depends on frontend internals (the account and workspace stores, <code>/billing/balance</code> units), so it needs checking against each Cloud frontend release.</li>
     <li><b>The extension on Cloud.</b> Cloud doesn't load custom nodes. Studio could inject the extension's frontend script (tagging, Send to Unreal) into the Cloud page itself and store the library in Cloud's user data. Is that acceptable, and does Cloud keep <code>extra.comfy_unreal</code> when it saves a workflow?</li>
     <li><b>Graph toolbar.</b> Once the extension is installed, keep Unreal's own Send to Unreal button above the page, or rely on the one inside ComfyUI?</li>
     <li><b>Batch semantics.</b> Batch count runs N jobs with new seeds. Should "selected textures" run one job per selected asset, like RTX Remix?</li>
     <li><b>Preview for sound and mesh.</b> A waveform with play, and a turntable, or open the asset editor?</li>
     <li><b>Brand.</b> Logo usage, the product name, and whether the extension is published by Comfy Org on the registry.</li>
-    <li><b>Desktop port.</b> Comfy Desktop listens on 8000; the plugin defaults to 8188. Detect both, or change the default?</li>
+    <li><b>Desktop port.</b> <i>Answered October 25: detect both, plus the ports in Comfy Desktop's installations list.</i></li>
+    <li><b>Run history.</b> Kept per user in <code>Saved/</code>. Should a team be able to share it, for example by saving runs beside the workflow asset?</li>
   </ol>
 </section>
 
@@ -768,7 +800,13 @@ svg.diagram{width:100%;height:auto;display:block}
       <tr><td>Oct 24</td><td>Tag workflows in a ComfyUI extension, with no compute nodes.</td><td>Tagged workflows keep running on Cloud and deployments. Same pattern as RTX Remix.</td></tr>
       <tr><td>Oct 24</td><td>Run view styled after App mode with ComfyUI's tokens.</td><td>It should read as a Comfy product, not an Unreal panel.</td></tr>
       <tr><td>Oct 24</td><td>Extension licensed GPL-3.0, plugin kept separate.</td><td>The ComfyUI frontend is GPL; the plugin talks to it over HTTP only.</td></tr>
-      <tr><td>Oct 24</td><td><i>Proposed:</i> Cloud runs from Studio go through the signed-in Graph page when there's no API key.</td><td>Sign-in already works in the panel; asking for a key as well is a second setup step most people won't finish.</td></tr>
+      <tr><td>Oct 24</td><td>Cloud runs from Studio go through the signed-in Graph page when there's no API key. <i>Built October 25.</i></td><td>Sign-in already works in the panel; asking for a key as well is a second setup step most people won't finish.</td></tr>
+      <tr><td>Oct 25</td><td>Onboarding is a welcome card in the Run view.</td><td>Studio opens on Run; the card explains the actual situation and offers the next step in place.</td></tr>
+      <tr><td>Oct 25</td><td>Look for local ComfyUI on 8000 and 8188 and in Comfy Desktop's installations list.</td><td>Desktop defaults to 8000, manual installs to 8188; Desktop's list also tells us when it only has Cloud.</td></tr>
+      <tr><td>Oct 25</td><td>Free runs and credits always in the status line, read from the page and refreshed after each run.</td><td>Never surprising: the user sees the cost of exploring as they go.</td></tr>
+      <tr><td>Oct 25</td><td>A refused key is skipped, not fatal, when a sign-in exists.</td><td>A stale <code>COMFY_API_KEY</code> blocked a signed-in user; Unreal can't change an environment variable, so it explains instead.</td></tr>
+      <tr><td>Oct 25</td><td>Run history is kept per user in <code>Saved/Comfy/Jobs</code>, beside the outputs.</td><td>Survives restarts without adding files to source control.</td></tr>
+      <tr><td>Oct 25</td><td>Built-ins become generic, core-node templates that run on Cloud and Desktop.</td><td>One template per job, not one per model or machine. Workflows show how to start; the plugin is the sandbox.</td></tr>
     </tbody>
   </table></div>
 </section>
@@ -780,6 +818,7 @@ svg.diagram{width:100%;height:auto;display:block}
   <div class="tbl"><table>
     <thead><tr><th>Version</th><th>Date</th><th>Changes</th></tr></thead>
     <tbody>
+      <tr><td>0.2</td><td>2026-10-25</td><td>Journey 1 built and tested: local detection, welcome card, Cloud sign-in through the page bridge, account and credits in the status line. UX review fixes: refused-key fallback, plainer errors, type, library cards, left column, disabled states. Project runs (run history). How the form comes from the workflow. Starter-template plan. New screenshots.</td></tr>
       <tr><td>0.1</td><td>2026-10-24</td><td>First version: product shape, seven UX journeys, Studio and extension specs, visual tokens, current state and open questions. Added Cloud sign-in findings and the page-bridge proposal after the first Cloud test.</td></tr>
     </tbody>
   </table></div>
