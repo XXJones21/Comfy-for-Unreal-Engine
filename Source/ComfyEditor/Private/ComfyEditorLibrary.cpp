@@ -291,7 +291,11 @@ TArray<UComfyWorkflow*> UComfyEditorLibrary::GetAllWorkflows()
 	}
 	if (UComfySubsystem* Comfy = UComfySubsystem::Get())
 	{
-		Result.Append(Comfy->GetBuiltInWorkflows());
+		// Built-ins saved as assets are already in the list from the asset registry.
+		for (UComfyWorkflow* Workflow : Comfy->GetBuiltInWorkflows())
+		{
+			Result.AddUnique(Workflow);
+		}
 		Result.Append(Comfy->GetServerWorkflows());
 	}
 	return Result;

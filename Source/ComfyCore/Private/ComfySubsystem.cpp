@@ -1,6 +1,7 @@
 // Copyright Comfy Org. All Rights Reserved.
 
 #include "ComfySubsystem.h"
+#include "ComfyInputsLibrary.h"
 #include "ComfyCoreModule.h"
 #include "ComfyJob.h"
 #include "ComfySettings.h"
@@ -19,6 +20,7 @@
 #include "Misc/Base64.h"
 #include "Misc/FileHelper.h"
 #include "Misc/Guid.h"
+#include "Misc/PackageName.h"
 #include "Misc/Paths.h"
 #include "HAL/PlatformFileManager.h"
 #include "HAL/FileManager.h"
@@ -658,6 +660,20 @@ UComfyJob* UComfySubsystem::RunWorkflowJson(const FString& ApiGraphJson, const T
 		return Job;
 	}
 	return RunWorkflow(Workflow, Inputs, Backend);
+}
+
+UComfyJob* UComfySubsystem::RunWorkflowWithInputs(UComfyWorkflow* Workflow, const FComfyInputs& Inputs, FName Backend)
+{
+	TMap<FString, FString> Values;
+	FString Error;
+	if (!UComfyInputsLibrary::ResolveComfyInputs(Workflow, Inputs, Values, Error))
+	{
+		UComfyJob* Job = NewJob(Backend.IsNone() ? GetActiveBackend() : Backend, Workflow ? Workflow->GetDisplayNameString() : TEXT("(no workflow)"));
+		Job->Workflow = Workflow;
+		Job->Fail(Error);
+		return Job;
+	}
+	return RunWorkflow(Workflow, Values, Backend);
 }
 
 UComfyJob* UComfySubsystem::RunWorkflow(UComfyWorkflow* Workflow, const TMap<FString, FString>& Inputs, FName Backend)
@@ -1319,6 +1335,18 @@ TArray<UComfyWorkflow*> UComfySubsystem::GetBuiltInWorkflows(bool bReload)
 
 		for (const FString& File : Files)
 		{
+			// The editor saves each built-in as an asset, so Blueprints can reference it and a game cooks it; prefer that.
+			const FString AssetName = FPaths::GetBaseFilename(File);
+			const FString PackageName = FString(UComfyWorkflow::BuiltInAssetPath) / AssetName;
+			if (FPackageName::DoesPackageExist(PackageName))
+			{
+				if (UComfyWorkflow* Asset = LoadObject<UComfyWorkflow>(nullptr, *(PackageName + TEXT(".") + AssetName), nullptr, LOAD_NoWarn | LOAD_Quiet))
+				{
+					BuiltInWorkflows.Add(Asset);
+					continue;
+				}
+			}
+
 			FString Json;
 			FString Error;
 			if (!FFileHelper::LoadFileToString(Json, *(Folder / File)))

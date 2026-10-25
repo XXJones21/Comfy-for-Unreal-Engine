@@ -80,6 +80,7 @@ Open from **Tools > Comfy Studio** or the **Comfy** toolbar button.
 | Function | Returns | Notes |
 | --- | --- | --- |
 | `RunWorkflow(Workflow, Inputs, Backend)` | `UComfyJob*` | Inputs keyed by manifest name; files as absolute paths. Backend None uses the active one. |
+| `RunWorkflowWithInputs(Workflow, ComfyInputs, Backend)` | `UComfyJob*` | Typed inputs (below). Unknown names and values that don't fit fail the job before anything is sent; Seed -1 gets a new seed; assets become files. |
 | `RunWorkflowJson(ApiGraphJson, Inputs, Backend)` | `UComfyJob*` | No asset needed. |
 | `RunRouterModel(ModelId, RequestJson, Backend)` | `UComfyJob*` | Router call; media URLs in the result become outputs. |
 | `GetRouterModelSchema(ModelId, OnResult)` / `ListRouterModels(Cursor, OnResult)` | async text | OpenAPI document; paged catalog. |
@@ -99,10 +100,15 @@ Events (Blueprint): `OnStateChanged`, `OnProgress`, `OnCompleted`, `OnFailed`. C
 
 Functions: `Cancel`, `IsFinished`, `Succeeded`, `GetOutput(Name)`, `GetOutputsOfKind(Kind)`, `GetOutputDirectory`.
 
-### Blueprint async nodes (`UComfyRunWorkflowAsyncAction`)
+### Blueprint nodes
 
-- **Run Comfy Workflow** (Workflow, Inputs, Backend) with exec pins On Progress, On Completed, On Failed, each passing the job.
+- **Run Comfy Workflow** (`UK2Node_RunComfyWorkflow`, ComfyBlueprint module): Workflow, one typed pin per workflow input once Workflow is set to an asset, Inputs (`FComfyInputs`, advanced), Backend. Exec pins On Progress, On Completed, On Failed, each passing the job. Pins left at their defaults aren't sent; Seed pins default to -1; Enum and Model pins have dropdowns (Model: installed files on a local backend, preferred files on Cloud and Router; empty means the backend's preferred match). The palette lists one **Run &lt;workflow&gt;** per workflow asset. Compiles to `UComfyInputsLibrary` setters feeding `UComfyRunWorkflowWithInputsAction`.
+- **Run Comfy Workflow (String Map)** (`UComfyRunWorkflowAsyncAction`): Workflow, `Map<String, String>` Inputs, Backend, same exec pins. Unknown keys are ignored.
 - **Run Comfy Router Model** (ModelId, RequestJson, Backend), same pins.
+
+### `FComfyInputs` and `UComfyInputsLibrary` (runtime-safe)
+
+`FComfyInputs` holds `Values` (name to text) and `Assets` (name to object, for File inputs). Pure setters return the inputs with one value added: `SetComfyText`, `SetComfyInt`, `SetComfyFloat`, `SetComfyBool`, `SetComfySeed` (-1 for a new seed each run), `SetComfyFile`, `SetComfyTexture`, `SetComfyAsset`. Also `MakeComfyInputsFromMap` (autocast from a string map), `GetComfyInputNames(Workflow)`, `ValidateComfyInputs(Workflow, Inputs, OutError)`.
 
 ### `UComfyRuntimeLibrary` (runtime-safe)
 
@@ -112,11 +118,12 @@ Functions: `Cancel`, `IsFinished`, `Succeeded`, `GetOutput(Name)`, `GetOutputsOf
 | `LoadSoundFromFile(Path)` / `LoadSoundFromJob(Job, OutputName)` | Transient `USoundWaveProcedural`; 16-bit PCM WAV. |
 | `MakeTileable(In, Out, BlendWidth)` | Half offset plus smoothstep blend over the exposed seams. |
 | `MakeNormalMap(In, Out, Strength)` | Wrap-aware Sobel on luminance, Unreal (DirectX) convention. |
+| `SaveTextureForInput(Texture, OutError)` | PNG in `Saved/Comfy/Inputs` for a File input. Render targets and loaded textures anywhere; texture assets in the editor. |
 | `NewSeed()` | |
 
 ### `UComfyWorkflow`
 
-`SetGraphFromJson(Json, bDetectInterface)`, `DetectInterface()`, `FindInput`, `GetInputNames`, `GetInputSchemaJson()` (JSON Schema for agents), `CreateTransientFromJson(Json)`.
+`SetGraphFromJson(Json, bDetectInterface)`, `DetectInterface()`, `IsBuiltIn()`, `FindInput`, `GetInputNames`, `GetInputSchemaJson()` (JSON Schema for agents), `CreateTransientFromJson(Json)`.
 
 ### `UComfyEditorLibrary` (editor only; Python `unreal.ComfyEditorLibrary`)
 

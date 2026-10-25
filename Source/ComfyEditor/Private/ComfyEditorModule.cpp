@@ -1,7 +1,12 @@
 // Copyright Comfy Org. All Rights Reserved.
 
 #include "ComfyEditorModule.h"
+#include "ComfyBuiltInAssets.h"
+#include "ComfyEditorLibrary.h"
 #include "ComfyEditorStyle.h"
+#include "ComfyGraphPins.h"
+#include "ComfyInputsLibrary.h"
+#include "EdGraphUtilities.h"
 #include "SComfyStudio.h"
 #include "Framework/Docking/TabManager.h"
 #include "Styling/AppStyle.h"
@@ -30,10 +35,28 @@ void FComfyEditorModule::StartupModule()
 		.SetIcon(FComfyEditorStyle::GetIcon());
 
 	UToolMenus::RegisterStartupCallback(FSimpleMulticastDelegate::FDelegate::CreateRaw(this, &FComfyEditorModule::RegisterMenus));
+
+	// Dropdowns for the Run Comfy Workflow node's choice and model pins.
+	PinFactory = MakeShared<FComfyGraphPinFactory>();
+	FEdGraphUtilities::RegisterVisualPinFactory(PinFactory);
+
+	// Comfy Inputs can carry meshes, sounds and textures with source art; only the editor can write those to files.
+	UComfyInputsLibrary::EditorAssetExporter = [](UObject* Asset, FString& OutError)
+	{
+		return UComfyEditorLibrary::ExportAssetForInput(Asset, OutError);
+	};
+
+	ComfyBuiltInAssets::Sync();
 }
 
 void FComfyEditorModule::ShutdownModule()
 {
+	UComfyInputsLibrary::EditorAssetExporter = nullptr;
+	if (PinFactory.IsValid())
+	{
+		FEdGraphUtilities::UnregisterVisualPinFactory(PinFactory);
+		PinFactory.Reset();
+	}
 	UToolMenus::UnRegisterStartupCallback(this);
 	UToolMenus::UnregisterOwner(this);
 	if (FSlateApplication::IsInitialized())

@@ -8,6 +8,7 @@
 #include "Serialization/JsonSerializer.h"
 #include "Serialization/JsonWriter.h"
 #include "Policies/CondensedJsonPrintPolicy.h"
+#include "Misc/Paths.h"
 #include "Misc/SecureHash.h"
 #include "Math/UnrealMathUtility.h"
 #include "UObject/Package.h"
@@ -758,6 +759,15 @@ FString UComfyWorkflow::GetNodeClass(const FString& NodeId) const
 const FComfyWorkflowOutput* UComfyWorkflow::FindOutputForNode(const FString& NodeId) const
 {
 	return Outputs.FindByPredicate([&NodeId](const FComfyWorkflowOutput& Output) { return Output.NodeId == NodeId; });
+}
+
+bool UComfyWorkflow::IsBuiltIn() const
+{
+	if (GetPathName().StartsWith(FString(BuiltInAssetPath) + TEXT("/")))
+	{
+		return true;
+	}
+	return HasAnyFlags(RF_Transient) && FPaths::GetPath(SourceFile).EndsWith(TEXT("Resources/Workflows"));
 }
 
 FString UComfyWorkflow::GetDisplayNameString() const

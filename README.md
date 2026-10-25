@@ -17,7 +17,7 @@ Alpha (0.1.0) for Comfy Org testers, built for the 2026 Epic AI MegaJam. Targets
   - **Graph:** the ComfyUI of the active backend (Comfy Desktop, or Comfy Cloud with its sign-in), embedded in the editor, with **Send to Unreal**.
 - **One API, four kinds of backend.** Comfy Desktop or any local ComfyUI (native `/prompt` API), Comfy Cloud and Comfy API deployments (Comfy API v2), and Comfy Router (direct partner-model calls). Switch with one dropdown; Blueprints and agents don't change.
 - **Comfy Cloud without a key.** Sign in on the Comfy Cloud page in the Graph view and Studio runs with that sign-in. The status line shows the account, free runs and Comfy Credits. A Comfy API Key works too.
-- **Workflows are assets.** Import a ComfyUI `Export (API)` JSON and it becomes a Comfy Workflow asset with a manifest of inputs and outputs ([docs/MANIFEST.md](docs/MANIFEST.md)). The manifest drives the Studio form and the agent tool schema; Blueprint and Python pass inputs by the same names.
+- **Workflows are assets.** Import a ComfyUI `Export (API)` JSON and it becomes a Comfy Workflow asset with a manifest of inputs and outputs ([docs/MANIFEST.md](docs/MANIFEST.md)). The manifest drives the Studio form, the Blueprint node's pins and the agent tool schema.
 - **Starter workflows** in `Resources/Workflows`, core ComfyUI nodes only, so they run on Comfy Cloud and on a local ComfyUI. See [Starter workflows](#starter-workflows).
 - **Project runs.** Every run is kept in `Saved/Comfy/Jobs` and listed at the bottom of the Run view. Opening one shows the result and puts its inputs back in the form.
 - **Agent toolset** for Epic's Unreal MCP server: `ComfyAgent.ComfyToolset` with tools such as `ListWorkflows`, `RunWorkflow`, `WaitForJob`, `CreateMaterialFromJob` and `GenerateMaterial` (prompt to assigned material in one call).
@@ -69,7 +69,9 @@ To make the prebuilt zip that testers install, package the plugin with `RunUAT B
      A level with a mesh using the generated material after Replace on selection, with Comfy Studio docked beside the viewport. -->
 > **Screenshot needed:** `docs/screenshots/replace-on-selection.png`. A level object wearing a generated material after **Replace on selection**.
 
-**Blueprint:** `Run Comfy Workflow` (async node with On Progress, On Completed, On Failed), then `Load Texture From Job` or `Load Sound From Job` for runtime use.
+**Blueprint:** `Run Comfy Workflow` is an async node with On Progress, On Completed and On Failed. Set its **Workflow** pin to an asset and it grows one typed pin per workflow input, the same inputs the Run view shows: text, whole numbers, numbers, on/off, a seed (-1 for a new one every run), a dropdown for choices and model files, and a texture pin for image inputs. Pins left at their defaults keep the workflow's own values, and an empty model pin lets each backend pick its preferred file. The right-click menu also has one **Run <workflow>** entry per workflow asset, starters included (`/ComfyUnreal/Workflows`, written by the editor from `Resources/Workflows`). Then use `Load Texture From Job` or `Load Sound From Job` for runtime use.
+
+To build inputs yourself, chain the **Set (Comfy Inputs)** nodes (Text, Int, Float, Bool, Seed, File, Texture, Asset) into the node's **Inputs** pin. A name the workflow doesn't have fails the run with the list of its inputs. The older `Run Comfy Workflow (String Map)` node still takes a string map.
 
 **C++:**
 
@@ -103,7 +105,8 @@ See [docs/SPEC.md](docs/SPEC.md) for the API outline and [docs/design/comfy-for-
 
 | Module | Type | What's in it |
 | --- | --- | --- |
-| ComfyCore | Runtime | Settings, workflow asset, jobs and run history, backends (native, API v2, Router, Cloud page bridge), subsystem, Blueprint async node, runtime loaders, image helpers, provenance |
+| ComfyCore | Runtime | Settings, workflow asset, jobs and run history, backends (native, API v2, Router, Cloud page bridge), subsystem, Comfy Inputs and the async actions, runtime loaders, image helpers, provenance |
+| ComfyBlueprint | UncookedOnly | The Run Comfy Workflow node: one pin per workflow input, compiled to Comfy Inputs calls |
 | ComfyEditor | Editor | Comfy Studio tab (Run and Graph views), workflow importer and reimport, asset definition, output import, PBR material builder |
 | ComfyAgent | Editor | `UComfyToolset` registered with the ToolsetRegistry for Unreal MCP |
 

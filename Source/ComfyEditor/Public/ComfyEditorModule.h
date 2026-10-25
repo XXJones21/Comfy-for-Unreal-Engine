@@ -19,4 +19,6 @@ public:
 private:
 	void RegisterMenus();
 	TSharedRef<class SDockTab> SpawnStudioTab(const class FSpawnTabArgs& Args);
+
+	TSharedPtr<struct FGraphPanelPinFactory> PinFactory;
 };

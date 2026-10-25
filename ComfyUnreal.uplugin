@@ -21,6 +21,11 @@
 			"LoadingPhase": "Default"
 		},
 		{
+			"Name": "ComfyBlueprint",
+			"Type": "UncookedOnly",
+			"LoadingPhase": "Default"
+		},
+		{
 			"Name": "ComfyEditor",
 			"Type": "Editor",
 			"LoadingPhase": "PostEngineInit"

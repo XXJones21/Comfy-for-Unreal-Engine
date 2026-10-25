@@ -1,0 +1,595 @@
+// Copyright Comfy Org. All Rights Reserved.
+
+#include "K2Node_RunComfyWorkflow.h"
+#include "ComfyInputsLibrary.h"
+#include "ComfyRunWorkflowAsyncAction.h"
+#include "ComfySubsystem.h"
+#include "ComfyWorkflow.h"
+#include "AssetRegistry/AssetRegistryModule.h"
+#include "BlueprintActionDatabaseRegistrar.h"
+#include "BlueprintAssetNodeSpawner.h"
+#include "BlueprintNodeSpawner.h"
+#include "EdGraphSchema_K2.h"
+#include "Engine/Texture.h"
+#include "K2Node_CallFunction.h"
+#include "Kismet/BlueprintAsyncActionBase.h"
+#include "Kismet2/BlueprintEditorUtils.h"
+#include "KismetCompiler.h"
+#include "Misc/Paths.h"
+
+#define LOCTEXT_NAMESPACE "K2Node_RunComfyWorkflow"
+
+const FName UK2Node_RunComfyWorkflow::WorkflowPinName(TEXT("Workflow"));
+const FName UK2Node_RunComfyWorkflow::InputsPinName(TEXT("Inputs"));
+
+namespace ComfyRunNodePrivate
+{
+	/** Input pins are named after the manifest input, behind a prefix so they can't clash with the node's own pins. */
+	static const FString InputPinPrefix(TEXT("ComfyInput_"));
+
+	static FName PinNameFor(const FComfyWorkflowInput& Input)
+	{
+		return FName(*(InputPinPrefix + Input.Name));
+	}
+
+	/** File inputs that take an image get a texture pin; the rest take a path. */
+	static bool TakesImage(const UComfyWorkflow* Workflow, const FComfyWorkflowInput& Input)
+	{
+		return Input.Source.Equals(TEXT("SelectedTextures"), ESearchCase::IgnoreCase)
+			|| Input.Source.Equals(TEXT("ViewportCapture"), ESearchCase::IgnoreCase)
+			|| Workflow->GetNodeClass(Input.NodeId).Contains(TEXT("LoadImage"));
+	}
+
+	struct FPinSpec
+	{
+		FName Category;
+		FName SubCategory;
+		UObject* SubCategoryObject = nullptr;
+		FString DefaultValue;
+		bool bAdvanced = false;
+	};
+
+	static FPinSpec SpecFor(const UComfyWorkflow* Workflow, const FComfyWorkflowInput& Input)
+	{
+		FPinSpec Spec;
+		switch (Input.Type)
+		{
+		case EComfyInputType::Int:
+			Spec.Category = UEdGraphSchema_K2::PC_Int64;
+			Spec.DefaultValue = LexToString(FCString::Atoi64(*Input.DefaultValue));
+			break;
+		case EComfyInputType::Seed:
+			// -1 asks for a new seed on every run, which is what a game usually wants.
+			Spec.Category = UEdGraphSchema_K2::PC_Int64;
+			Spec.DefaultValue = TEXT("-1");
+			break;
+		case EComfyInputType::Float:
+			Spec.Category = UEdGraphSchema_K2::PC_Real;
+			Spec.SubCategory = UEdGraphSchema_K2::PC_Double;
+			Spec.DefaultValue = FString::SanitizeFloat(FCString::Atod(*Input.DefaultValue));
+			break;
+		case EComfyInputType::Bool:
+			Spec.Category = UEdGraphSchema_K2::PC_Boolean;
+			Spec.DefaultValue = Input.DefaultValue.ToBool() ? TEXT("true") : TEXT("false");
+			break;
+		case EComfyInputType::File:
+			if (TakesImage(Workflow, Input))
+			{
+				Spec.Category = UEdGraphSchema_K2::PC_Object;
+				Spec.SubCategoryObject = UTexture::StaticClass();
+			}
+			else
+			{
+				Spec.Category = UEdGraphSchema_K2::PC_String;
+			}
+			break;
+		case EComfyInputType::Model:
+			// Empty picks the backend's best match from the workflow's Prefer list, so the same graph runs on Cloud and Desktop.
+			Spec.Category = UEdGraphSchema_K2::PC_String;
+			Spec.bAdvanced = true;
+			break;
+		default:
+			Spec.Category = UEdGraphSchema_K2::PC_String;
+			Spec.DefaultValue = Input.DefaultValue;
+			break;
+		}
+		return Spec;
+	}
+
+	/** The Set (Comfy Inputs) function for a pin, and its value parameter. Chosen by pin type, so a stale pin still compiles. */
+	static void SetterFor(const UEdGraphPin* Pin, const FComfyWorkflowInput& Input, FName& OutFunction, FName& OutValuePin)
+	{
+		const FName Category = Pin->PinType.PinCategory;
+		OutValuePin = TEXT("Value");
+		if (Category == UEdGraphSchema_K2::PC_Object)
+		{
+			OutFunction = GET_FUNCTION_NAME_CHECKED(UComfyInputsLibrary, SetComfyTexture);
+			OutValuePin = TEXT("Texture");
+		}
+		else if (Category == UEdGraphSchema_K2::PC_Int64 || Category == UEdGraphSchema_K2::PC_Int)
+		{
+			if (Input.Type == EComfyInputType::Seed)
+			{
+				OutFunction = GET_FUNCTION_NAME_CHECKED(UComfyInputsLibrary, SetComfySeed);
+				OutValuePin = TEXT("Seed");
+			}
+			else
+			{
+				OutFunction = GET_FUNCTION_NAME_CHECKED(UComfyInputsLibrary, SetComfyInt);
+			}
+		}
+		else if (Category == UEdGraphSchema_K2::PC_Real)
+		{
+			OutFunction = GET_FUNCTION_NAME_CHECKED(UComfyInputsLibrary, SetComfyFloat);
+		}
+		else if (Category == UEdGraphSchema_K2::PC_Boolean)
+		{
+			OutFunction = GET_FUNCTION_NAME_CHECKED(UComfyInputsLibrary, SetComfyBool);
+		}
+		else
+		{
+			OutFunction = GET_FUNCTION_NAME_CHECKED(UComfyInputsLibrary, SetComfyText);
+		}
+	}
+
+	/** Pins left at their defaults aren't sent, so the workflow's own value (or the backend's model match) applies. Seeds always are. */
+	static bool ShouldSend(const UEdGraphPin* Pin, const FComfyWorkflowInput& Input)
+	{
+		if (Pin->LinkedTo.Num() > 0 || Input.Type == EComfyInputType::Seed)
+		{
+			return true;
+		}
+		if (Pin->PinType.PinCategory == UEdGraphSchema_K2::PC_Object)
+		{
+			return Pin->DefaultObject != nullptr;
+		}
+		return !GetDefault<UEdGraphSchema_K2>()->DoesDefaultValueMatchAutogenerated(*Pin);
+	}
+
+	static FText WorkflowName(const FAssetData& Asset)
+	{
+		FText DisplayName;
+		if (Asset.GetTagValue(GET_MEMBER_NAME_CHECKED(UComfyWorkflow, DisplayName), DisplayName) && !DisplayName.IsEmpty())
+		{
+			return DisplayName;
+		}
+		FString Name = Asset.AssetName.ToString();
+		Name.RemoveFromStart(TEXT("CW_"));
+		return FText::FromString(FName::NameToDisplayString(Name, false));
+	}
+
+	static FText TypeText(EComfyInputType Type)
+	{
+		switch (Type)
+		{
+		case EComfyInputType::Int: return LOCTEXT("TypeInt", "Whole number");
+		case EComfyInputType::Float: return LOCTEXT("TypeFloat", "Number");
+		case EComfyInputType::Bool: return LOCTEXT("TypeBool", "On or off");
+		case EComfyInputType::Seed: return LOCTEXT("TypeSeed", "Seed");
+		case EComfyInputType::File: return LOCTEXT("TypeFile", "File");
+		case EComfyInputType::Enum: return LOCTEXT("TypeEnum", "Choice");
+		case EComfyInputType::Model: return LOCTEXT("TypeModel", "Model file");
+		default: return LOCTEXT("TypeText", "Text");
+		}
+	}
+}
+
+UK2Node_RunComfyWorkflow::UK2Node_RunComfyWorkflow(const FObjectInitializer& ObjectInitializer)
+	: Super(ObjectInitializer)
+{
+	ProxyFactoryFunctionName = GET_FUNCTION_NAME_CHECKED(UComfyRunWorkflowWithInputsAction, RunComfyWorkflowWithInputs);
+	ProxyFactoryClass = UComfyRunWorkflowWithInputsAction::StaticClass();
+	ProxyClass = UComfyRunWorkflowWithInputsAction::StaticClass();
+	ProxyActivateFunctionName = GET_FUNCTION_NAME_CHECKED(UBlueprintAsyncActionBase, Activate);
+}
+
+void UK2Node_RunComfyWorkflow::AllocateDefaultPins()
+{
+	Super::AllocateDefaultPins();
+
+	UEdGraphPin* WorkflowPin = FindPin(WorkflowPinName);
+	if (WorkflowPin && PinsWorkflow && !WorkflowPin->DefaultObject)
+	{
+		WorkflowPin->DefaultObject = PinsWorkflow;
+	}
+	CreateInputPins();
+}
+
+void UK2Node_RunComfyWorkflow::CreateInputPins()
+{
+	using namespace ComfyRunNodePrivate;
+
+	PinsSignature = MakeSignature(PinsWorkflow);
+	if (!PinsWorkflow)
+	{
+		return;
+	}
+
+	const UEdGraphSchema_K2* Schema = GetDefault<UEdGraphSchema_K2>();
+	bool bAnyAdvanced = false;
+	for (const FComfyWorkflowInput& Input : PinsWorkflow->Inputs)
+	{
+		const FPinSpec Spec = SpecFor(PinsWorkflow, Input);
+		UEdGraphPin* Pin = CreatePin(EGPD_Input, Spec.Category, Spec.SubCategory, Spec.SubCategoryObject, PinNameFor(Input));
+		Pin->PinFriendlyName = FText::FromString(Input.Label.IsEmpty() ? Input.Name : Input.Label);
+		Schema->SetPinAutogeneratedDefaultValue(Pin, Spec.DefaultValue);
+		Pin->bAdvancedView = Spec.bAdvanced;
+		bAnyAdvanced |= Spec.bAdvanced;
+	}
+
+	// The struct pin still adds to or overrides the pins, for values built elsewhere; it's rarely needed here.
+	if (UEdGraphPin* InputsPin = FindPin(InputsPinName))
+	{
+		InputsPin->bAdvancedView = true;
+		bAnyAdvanced = true;
+	}
+	if (bAnyAdvanced && AdvancedPinDisplay == ENodeAdvancedPins::NoPins)
+	{
+		AdvancedPinDisplay = ENodeAdvancedPins::Hidden;
+	}
+}
+
+void UK2Node_RunComfyWorkflow::RebuildInputPins()
+{
+	TArray<UEdGraphPin*> OldPins;
+	for (UEdGraphPin* Pin : Pins)
+	{
+		if (IsInputPin(Pin))
+		{
+			OldPins.Add(Pin);
+		}
+	}
+	for (UEdGraphPin* Pin : OldPins)
+	{
+		Pin->Modify();
+		Pin->BreakAllPinLinks(true);
+		RemovePin(Pin);
+	}
+	if (UEdGraphPin* InputsPin = FindPin(InputsPinName))
+	{
+		InputsPin->bAdvancedView = false;
+	}
+	CreateInputPins();
+
+	if (UEdGraph* Graph = GetGraph())
+	{
+		Graph->NotifyNodeChanged(this);
+	}
+	if (UBlueprint* Blueprint = GetBlueprint())
+	{
+		FBlueprintEditorUtils::MarkBlueprintAsModified(Blueprint);
+	}
+}
+
+bool UK2Node_RunComfyWorkflow::IsInputPin(const UEdGraphPin* Pin)
+{
+	return Pin && Pin->PinName.ToString().StartsWith(ComfyRunNodePrivate::InputPinPrefix);
+}
+
+FString UK2Node_RunComfyWorkflow::MakeSignature(const UComfyWorkflow* Workflow)
+{
+	if (!Workflow)
+	{
+		return FString();
+	}
+	return FString::JoinBy(Workflow->Inputs, TEXT(";"), [Workflow](const FComfyWorkflowInput& Input)
+	{
+		const ComfyRunNodePrivate::FPinSpec Spec = ComfyRunNodePrivate::SpecFor(Workflow, Input);
+		return FString::Printf(TEXT("%s:%s:%s"), *Input.Name, *Spec.Category.ToString(), *Input.Label);
+	});
+}
+
+const FComfyWorkflowInput* UK2Node_RunComfyWorkflow::FindInputForPin(const UEdGraphPin* Pin) const
+{
+	if (!PinsWorkflow || !IsInputPin(Pin))
+	{
+		return nullptr;
+	}
+	const FString Name = Pin->PinName.ToString().RightChop(ComfyRunNodePrivate::InputPinPrefix.Len());
+	return PinsWorkflow->Inputs.FindByPredicate([&Name](const FComfyWorkflowInput& Input) { return Input.Name.Equals(Name, ESearchCase::IgnoreCase); });
+}
+
+TArray<FString> UK2Node_RunComfyWorkflow::GetPinChoices(const UEdGraphPin* Pin) const
+{
+	const FComfyWorkflowInput* Input = FindInputForPin(Pin);
+	if (!Input || Pin->PinType.PinCategory != UEdGraphSchema_K2::PC_String)
+	{
+		return {};
+	}
+	if (Input->Type == EComfyInputType::Enum)
+	{
+		return Input->Options;
+	}
+	if (Input->Type != EComfyInputType::Model)
+	{
+		return {};
+	}
+
+	// A local ComfyUI lists what's installed. Cloud and Router (or a local ComfyUI nobody has checked yet) get the
+	// workflow's preferred files, which Cloud has.
+	TArray<FString> Choices;
+	if (UComfySubsystem* Comfy = UComfySubsystem::Get())
+	{
+		const FName Backend = Comfy->GetActiveBackend();
+		FComfyBackendProfile Profile;
+		if (Comfy->GetBackendProfile(Backend, Profile) && Profile.Kind == EComfyBackendKind::Local)
+		{
+			Choices = Comfy->GetInputOptions(Backend, PinsWorkflow, Input->Name);
+		}
+	}
+	if (Choices.Num() == 0)
+	{
+		if (!Input->DefaultValue.IsEmpty())
+		{
+			Choices.Add(Input->DefaultValue);
+		}
+		for (const FString& Preferred : Input->Prefer)
+		{
+			// Prefer entries can be name fragments; only whole file names make sense as a choice.
+			if (FPaths::GetExtension(Preferred).Len() > 0)
+			{
+				Choices.AddUnique(Preferred);
+			}
+		}
+	}
+	Choices.Insert(FString(), 0);
+	return Choices;
+}
+
+FText UK2Node_RunComfyWorkflow::GetNodeTitle(ENodeTitleType::Type TitleType) const
+{
+	if (!PinsWorkflow)
+	{
+		return LOCTEXT("Title", "Run Comfy Workflow");
+	}
+	const FText Name = FText::FromString(PinsWorkflow->GetDisplayNameString());
+	if (TitleType == ENodeTitleType::FullTitle)
+	{
+		return FText::Format(LOCTEXT("TitleFullFmt", "Run {0}\nComfy Workflow"), Name);
+	}
+	return FText::Format(LOCTEXT("TitleFmt", "Run {0}"), Name);
+}
+
+FText UK2Node_RunComfyWorkflow::GetTooltipText() const
+{
+	const FText Base = LOCTEXT("Tooltip", "Run a ComfyUI workflow on the active backend, or the one named on Backend. Set Workflow to an asset to get a pin for each of its inputs; pins left at their defaults keep the workflow's values.\n\nOn Progress fires while it runs, then On Completed (outputs downloaded) or On Failed (see the job's error) fires once.");
+	if (PinsWorkflow && !PinsWorkflow->Description.IsEmpty())
+	{
+		return FText::Format(LOCTEXT("TooltipWithDescription", "{0}\n\n{1}"), PinsWorkflow->Description, Base);
+	}
+	return Base;
+}
+
+FText UK2Node_RunComfyWorkflow::GetMenuCategory() const
+{
+	return LOCTEXT("MenuCategory", "Comfy");
+}
+
+bool UK2Node_RunComfyWorkflow::IsInCompilerGraph() const
+{
+	// The compiler expands a transient copy of the graph; its pin changes aren't the user's.
+	const UEdGraph* Graph = GetGraph();
+	return Graph && Graph->HasAnyFlags(RF_Transient);
+}
+
+void UK2Node_RunComfyWorkflow::PinDefaultValueChanged(UEdGraphPin* Pin)
+{
+	Super::PinDefaultValueChanged(Pin);
+	if (Pin && Pin->PinName == WorkflowPinName && Pin->LinkedTo.Num() == 0 && !IsInCompilerGraph())
+	{
+		UComfyWorkflow* NewWorkflow = Cast<UComfyWorkflow>(Pin->DefaultObject);
+		if (NewWorkflow != PinsWorkflow)
+		{
+			Modify();
+			PinsWorkflow = NewWorkflow;
+			RebuildInputPins();
+		}
+	}
+}
+
+void UK2Node_RunComfyWorkflow::PinConnectionListChanged(UEdGraphPin* Pin)
+{
+	Super::PinConnectionListChanged(Pin);
+	if (Pin && Pin->PinName == WorkflowPinName && !IsInCompilerGraph())
+	{
+		// A wired workflow isn't known until the game runs, so its inputs come from the Inputs pin.
+		UComfyWorkflow* NewWorkflow = Pin->LinkedTo.Num() > 0 ? nullptr : Cast<UComfyWorkflow>(Pin->DefaultObject);
+		if (NewWorkflow != PinsWorkflow)
+		{
+			Modify();
+			PinsWorkflow = NewWorkflow;
+			RebuildInputPins();
+		}
+	}
+}
+
+void UK2Node_RunComfyWorkflow::GetPinHoverText(const UEdGraphPin& Pin, FString& HoverTextOut) const
+{
+	const FComfyWorkflowInput* Input = FindInputForPin(&Pin);
+	if (!Input)
+	{
+		Super::GetPinHoverText(Pin, HoverTextOut);
+		return;
+	}
+
+	TArray<FString> Lines;
+	Lines.Add(FString::Printf(TEXT("%s, input \"%s\""), *ComfyRunNodePrivate::TypeText(Input->Type).ToString(), *Input->Name));
+	if (!Input->Tooltip.IsEmpty())
+	{
+		Lines.Add(Input->Tooltip);
+	}
+	switch (Input->Type)
+	{
+	case EComfyInputType::Seed:
+		Lines.Add(TEXT("-1 gets a new seed on every run."));
+		break;
+	case EComfyInputType::Model:
+		Lines.Add(Input->Prefer.Num() > 0
+			? FString::Printf(TEXT("Empty uses the first of these the backend has: %s."), *FString::Join(Input->Prefer, TEXT(", ")))
+			: FString(TEXT("Empty uses the workflow's file.")));
+		break;
+	case EComfyInputType::Enum:
+		if (Input->Options.Num() > 0)
+		{
+			Lines.Add(FString::Printf(TEXT("Choices: %s."), *FString::Join(Input->Options, TEXT(", "))));
+		}
+		break;
+	case EComfyInputType::File:
+		Lines.Add(Pin.PinType.PinCategory == UEdGraphSchema_K2::PC_Object
+			? FString(TEXT("A texture or render target. It's written to Saved/Comfy/Inputs as a PNG when the run starts."))
+			: FString(TEXT("A path to a file on disk.")));
+		break;
+	default:
+		break;
+	}
+	if (Input->Type != EComfyInputType::Seed)
+	{
+		Lines.Add(TEXT("Left at its default, the workflow's own value is used."));
+	}
+	GetDefault<UEdGraphSchema_K2>()->ConstructBasicPinTooltip(Pin, FText::FromString(FString::Join(Lines, TEXT("\n"))), HoverTextOut);
+}
+
+void UK2Node_RunComfyWorkflow::ValidateNodeDuringCompilation(FCompilerResultsLog& MessageLog) const
+{
+	Super::ValidateNodeDuringCompilation(MessageLog);
+
+	const UEdGraphPin* WorkflowPin = FindPin(WorkflowPinName);
+	if (WorkflowPin && WorkflowPin->LinkedTo.Num() == 0 && !WorkflowPin->DefaultObject)
+	{
+		MessageLog.Error(*LOCTEXT("NoWorkflow", "@@ has no workflow. Pick one on its Workflow pin.").ToString(), this);
+		return;
+	}
+	if (PinsWorkflow && MakeSignature(PinsWorkflow) != PinsSignature)
+	{
+		MessageLog.Warning(*FText::Format(LOCTEXT("InputsChanged", "@@: the inputs of {0} changed since this node was made. Right-click the node and choose Refresh Node."),
+			FText::FromString(PinsWorkflow->GetDisplayNameString())).ToString(), this);
+	}
+	for (const UEdGraphPin* Pin : Pins)
+	{
+		const FComfyWorkflowInput* Input = FindInputForPin(Pin);
+		if (Input && Input->Type == EComfyInputType::Enum && Input->Options.Num() > 0 && Pin->LinkedTo.Num() == 0
+			&& !Pin->DefaultValue.IsEmpty() && !Input->Options.Contains(Pin->DefaultValue))
+		{
+			MessageLog.Warning(*FText::Format(LOCTEXT("BadChoice", "@@: \"{0}\" isn't a choice for {1}. Choices: {2}."),
+				FText::FromString(Pin->DefaultValue), Pin->GetDisplayName(), FText::FromString(FString::Join(Input->Options, TEXT(", ")))).ToString(), this);
+		}
+	}
+}
+
+void UK2Node_RunComfyWorkflow::ExpandNode(FKismetCompilerContext& CompilerContext, UEdGraph* SourceGraph)
+{
+	using namespace ComfyRunNodePrivate;
+
+	const UEdGraphSchema_K2* Schema = CompilerContext.GetSchema();
+	UEdGraphPin* InputsPin = FindPinChecked(InputsPinName);
+
+	TArray<UEdGraphPin*> InputPins;
+	for (UEdGraphPin* Pin : Pins)
+	{
+		if (IsInputPin(Pin) && !Pin->bOrphanedPin)
+		{
+			InputPins.Add(Pin);
+		}
+	}
+
+	// Chain one Set (Comfy Inputs) call per pin onto whatever the Inputs pin holds, and feed the result back into it,
+	// so the base expansion passes it to the factory like any other parameter.
+	bool bOk = true;
+	UEdGraphPin* Chain = nullptr;
+	for (UEdGraphPin* Pin : InputPins)
+	{
+		const FComfyWorkflowInput* Input = FindInputForPin(Pin);
+		if (!Input)
+		{
+			CompilerContext.MessageLog.Error(*FText::Format(LOCTEXT("StalePin", "@@: the workflow has no input for pin {0}. Right-click the node and choose Refresh Node."), Pin->GetDisplayName()).ToString(), this);
+			bOk = false;
+			continue;
+		}
+		if (!ShouldSend(Pin, *Input))
+		{
+			continue;
+		}
+
+		FName Function;
+		FName ValuePinName;
+		SetterFor(Pin, *Input, Function, ValuePinName);
+		UK2Node_CallFunction* Call = CompilerContext.SpawnIntermediateNode<UK2Node_CallFunction>(this, SourceGraph);
+		Call->FunctionReference.SetExternalMember(Function, UComfyInputsLibrary::StaticClass());
+		Call->AllocateDefaultPins();
+
+		UEdGraphPin* CallInputs = Call->FindPinChecked(TEXT("Inputs"));
+		if (Chain)
+		{
+			bOk &= Schema->TryCreateConnection(Chain, CallInputs);
+		}
+		else
+		{
+			bOk &= CompilerContext.MovePinLinksToIntermediate(*InputsPin, *CallInputs).CanSafeConnect();
+		}
+		Call->FindPinChecked(TEXT("Name"))->DefaultValue = Input->Name;
+		bOk &= CompilerContext.MovePinLinksToIntermediate(*Pin, *Call->FindPinChecked(ValuePinName)).CanSafeConnect();
+		Chain = Call->GetReturnValuePin();
+	}
+	if (Chain)
+	{
+		bOk &= Schema->TryCreateConnection(Chain, InputsPin);
+	}
+
+	// The base expansion expects only the factory's parameters as data inputs.
+	for (UEdGraphPin* Pin : InputPins)
+	{
+		Pin->BreakAllPinLinks();
+		RemovePin(Pin);
+	}
+	if (!bOk)
+	{
+		CompilerContext.MessageLog.Error(*LOCTEXT("InternalError", "@@: couldn't connect the workflow's input pins.").ToString(), this);
+	}
+
+	Super::ExpandNode(CompilerContext, SourceGraph);
+}
+
+void UK2Node_RunComfyWorkflow::GetMenuActions(FBlueprintActionDatabaseRegistrar& ActionRegistrar) const
+{
+	UClass* NodeClass = GetClass();
+	if (ActionRegistrar.IsOpenForRegistration(NodeClass))
+	{
+		ActionRegistrar.AddBlueprintAction(NodeClass, UBlueprintNodeSpawner::Create(NodeClass));
+	}
+
+	// One entry per workflow asset, so "Run Seamless Texture" is in the menu with its pins already made.
+	auto AddWorkflowAction = [&ActionRegistrar, NodeClass](const FAssetData& Asset)
+	{
+		UBlueprintAssetNodeSpawner* Spawner = UBlueprintAssetNodeSpawner::Create(NodeClass, Asset);
+		Spawner->CustomizeNodeDelegate = UBlueprintNodeSpawner::FCustomizeNodeDelegate::CreateLambda([Asset](UEdGraphNode* NewNode, bool /*bIsTemplateNode*/)
+		{
+			CastChecked<UK2Node_RunComfyWorkflow>(NewNode)->PinsWorkflow = Cast<UComfyWorkflow>(Asset.GetAsset());
+		});
+		const FText Name = ComfyRunNodePrivate::WorkflowName(Asset);
+		Spawner->DefaultMenuSignature.MenuName = FText::Format(LOCTEXT("WorkflowMenuName", "Run {0}"), Name);
+		Spawner->DefaultMenuSignature.Category = LOCTEXT("WorkflowMenuCategory", "Comfy|Workflows");
+		Spawner->DefaultMenuSignature.Tooltip = FText::Format(LOCTEXT("WorkflowMenuTooltip", "Run the Comfy workflow {0}, with a pin for each of its inputs."), Name);
+		Spawner->DefaultMenuSignature.Keywords = LOCTEXT("WorkflowMenuKeywords", "Comfy ComfyUI workflow generate");
+		ActionRegistrar.AddBlueprintAction(Asset, Spawner);
+	};
+
+	const UObject* KeyFilter = ActionRegistrar.GetActionKeyFilter();
+	if (KeyFilter == nullptr || KeyFilter == NodeClass)
+	{
+		TArray<FAssetData> Assets;
+		FAssetRegistryModule::GetRegistry().GetAssetsByClass(UComfyWorkflow::StaticClass()->GetClassPathName(), Assets);
+		for (const FAssetData& Asset : Assets)
+		{
+			if (Asset.IsUAsset())
+			{
+				AddWorkflowAction(Asset);
+			}
+		}
+	}
+	else if (const UComfyWorkflow* Workflow = Cast<UComfyWorkflow>(KeyFilter))
+	{
+		AddWorkflowAction(FAssetData(Workflow));
+	}
+}
+
+#undef LOCTEXT_NAMESPACE

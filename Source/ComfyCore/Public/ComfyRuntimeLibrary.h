@@ -8,6 +8,7 @@
 #include "ComfyRuntimeLibrary.generated.h"
 
 class UComfyJob;
+class UTexture;
 class UTexture2D;
 class USoundWaveProcedural;
 
@@ -51,6 +52,14 @@ public:
 	 */
 	UFUNCTION(BlueprintCallable, Category = "Comfy|Image")
 	static bool MakeNormalMap(const FString& InputPath, const FString& OutputPath, float Strength = 6.f);
+
+	/**
+	 * Write a texture to a PNG in Saved/Comfy/Inputs, for a workflow's File input, and return its path.
+	 * Works for render targets and for textures from Load Texture From File or Job anywhere, and for
+	 * texture assets in the editor. A packaged game can't read other textures' pixels back.
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Comfy|Image")
+	static FString SaveTextureForInput(UTexture* Texture, FString& OutError);
 
 	/** A random seed in the range ComfyUI accepts. */
 	UFUNCTION(BlueprintPure, Category = "Comfy", meta = (DisplayName = "New Comfy Seed"))

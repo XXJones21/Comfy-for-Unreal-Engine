@@ -218,7 +218,7 @@ FString SComfyRunView::OriginOf(const UComfyWorkflow* Workflow)
 	{
 		return TEXT("Server");
 	}
-	return Workflow && Workflow->HasAnyFlags(RF_Transient) ? TEXT("Built-in") : TEXT("Project");
+	return Workflow && (Workflow->IsBuiltIn() || Workflow->HasAnyFlags(RF_Transient)) ? TEXT("Built-in") : TEXT("Project");
 }
 
 void SComfyRunView::SetStatus(const FText& Text, bool bError)

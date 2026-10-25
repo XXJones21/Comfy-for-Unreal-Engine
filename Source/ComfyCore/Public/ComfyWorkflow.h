@@ -62,6 +62,10 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Graph")
 	FString SourceFile;
 
+	/** Built-in workflows saved as assets: MD5 of the Resources/Workflows file they were made from, so the editor can tell when to update them. */
+	UPROPERTY(VisibleAnywhere, Category = "Graph", AdvancedDisplay)
+	FString BuiltInSourceHash;
+
 	/** The canvas (UI) save of the graph when it came from the ComfyUI frontend, so the Graph view can reopen it with layout. */
 	UPROPERTY(VisibleAnywhere, Category = "Graph", AdvancedDisplay, meta = (MultiLine = true))
 	FString UiGraphJson;
@@ -117,6 +121,13 @@ public:
 	const FComfyWorkflowOutput* FindOutputForNode(const FString& NodeId) const;
 
 	FString GetDisplayNameString() const;
+
+	/** True for the plugin's own workflows: the assets in BuiltInAssetPath, or transient copies loaded from Resources/Workflows. */
+	UFUNCTION(BlueprintPure, Category = "Comfy|Workflow")
+	bool IsBuiltIn() const;
+
+	/** Where the plugin's built-in workflows are saved as assets, one per file in Resources/Workflows, named after the file. */
+	static constexpr const TCHAR* BuiltInAssetPath = TEXT("/ComfyUnreal/Workflows");
 
 private:
 	TSharedPtr<FJsonObject> ParseGraph(FString& OutError) const;

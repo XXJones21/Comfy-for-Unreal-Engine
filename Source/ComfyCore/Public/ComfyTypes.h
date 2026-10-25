@@ -223,6 +223,25 @@ struct COMFYCORE_API FComfyWorkflowPreset
 	TMap<FString, FString> Values;
 };
 
+/**
+ * Values for a workflow's inputs, keyed by the names in its manifest. Build it with the Set nodes in
+ * Comfy|Inputs and pass it to Run Comfy Workflow. Names are checked against the workflow when the run starts,
+ * so a misspelled name fails the run instead of being ignored.
+ */
+USTRUCT(BlueprintType, meta = (DisplayName = "Comfy Inputs"))
+struct COMFYCORE_API FComfyInputs
+{
+	GENERATED_BODY()
+
+	/** Input name to value, as text. A Seed of -1 gets a new seed on every run. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Comfy")
+	TMap<FString, FString> Values;
+
+	/** Assets for File inputs, such as a texture or render target. Each is written to a file when the run starts. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Comfy")
+	TMap<FString, TObjectPtr<UObject>> Assets;
+};
+
 /** One workflow output and how it lands in Unreal. */
 USTRUCT(BlueprintType)
 struct COMFYCORE_API FComfyWorkflowOutput

@@ -8,7 +8,7 @@
 UComfyRunWorkflowAsyncAction* UComfyRunWorkflowAsyncAction::RunComfyWorkflow(UObject* WorldContextObject, UComfyWorkflow* InWorkflow, const TMap<FString, FString>& InInputs, FName InBackend)
 {
 	UComfyRunWorkflowAsyncAction* Action = NewObject<UComfyRunWorkflowAsyncAction>();
-	Action->Workflow = InWorkflow;
+	Action->WorkflowToRun = InWorkflow;
 	Action->Inputs = InInputs;
 	Action->Backend = InBackend;
 	Action->RegisterWithGameInstance(WorldContextObject);
@@ -36,9 +36,7 @@ void UComfyRunWorkflowAsyncAction::Activate()
 		return;
 	}
 
-	Job = ModelId.IsEmpty()
-		? Comfy->RunWorkflow(Workflow, Inputs, Backend)
-		: Comfy->RunRouterModel(ModelId, RequestJson, Backend);
+	Job = StartJob(Comfy);
 
 	if (!Job)
 	{
@@ -56,6 +54,13 @@ void UComfyRunWorkflowAsyncAction::Activate()
 
 	Job->OnProgress.AddDynamic(this, &UComfyRunWorkflowAsyncAction::HandleProgress);
 	Job->OnFinishedNative.AddUObject(this, &UComfyRunWorkflowAsyncAction::HandleFinished);
+}
+
+UComfyJob* UComfyRunWorkflowAsyncAction::StartJob(UComfySubsystem* Comfy)
+{
+	return ModelId.IsEmpty()
+		? Comfy->RunWorkflow(WorkflowToRun, Inputs, Backend)
+		: Comfy->RunRouterModel(ModelId, RequestJson, Backend);
 }
 
 void UComfyRunWorkflowAsyncAction::HandleProgress(UComfyJob* InJob)
@@ -80,4 +85,19 @@ void UComfyRunWorkflowAsyncAction::HandleFinished(UComfyJob* InJob)
 		OnFailed.Broadcast(InJob);
 	}
 	SetReadyToDestroy();
+}
+
+UComfyRunWorkflowWithInputsAction* UComfyRunWorkflowWithInputsAction::RunComfyWorkflowWithInputs(UObject* WorldContextObject, UComfyWorkflow* InWorkflow, const FComfyInputs& InInputs, FName InBackend)
+{
+	UComfyRunWorkflowWithInputsAction* Action = NewObject<UComfyRunWorkflowWithInputsAction>();
+	Action->WorkflowToRun = InWorkflow;
+	Action->TypedInputs = InInputs;
+	Action->Backend = InBackend;
+	Action->RegisterWithGameInstance(WorldContextObject);
+	return Action;
+}
+
+UComfyJob* UComfyRunWorkflowWithInputsAction::StartJob(UComfySubsystem* Comfy)
+{
+	return Comfy->RunWorkflowWithInputs(WorkflowToRun, TypedInputs, Backend);
 }

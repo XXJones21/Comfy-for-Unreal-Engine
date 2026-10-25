@@ -5,10 +5,23 @@
 #include "ComfyJob.h"
 #include "Audio.h"
 #include "Engine/Texture2D.h"
+#include "Engine/TextureRenderTarget.h"
+#include "HAL/FileManager.h"
 #include "ImageCore.h"
 #include "ImageUtils.h"
 #include "Misc/FileHelper.h"
+#include "Misc/Paths.h"
 #include "Sound/SoundWaveProcedural.h"
+
+namespace ComfyRuntimePrivate
+{
+	/** The file each texture from Load Texture From File came from, so it can go back to ComfyUI as is. */
+	static TMap<TWeakObjectPtr<UTexture2D>, FString>& LoadedTextureFiles()
+	{
+		static TMap<TWeakObjectPtr<UTexture2D>, FString> Files;
+		return Files;
+	}
+}
 
 UTexture2D* UComfyRuntimeLibrary::LoadTextureFromFile(const FString& FilePath, bool bSRGB)
 {
@@ -25,8 +38,62 @@ UTexture2D* UComfyRuntimeLibrary::LoadTextureFromFile(const FString& FilePath, b
 	{
 		Texture->SRGB = bSRGB;
 		Texture->UpdateResource();
+
+		TMap<TWeakObjectPtr<UTexture2D>, FString>& Files = ComfyRuntimePrivate::LoadedTextureFiles();
+		for (auto It = Files.CreateIterator(); It; ++It)
+		{
+			if (!It.Key().IsValid())
+			{
+				It.RemoveCurrent();
+			}
+		}
+		Files.Add(Texture, FPaths::ConvertRelativePathToFull(FilePath));
 	}
 	return Texture;
+}
+
+FString UComfyRuntimeLibrary::SaveTextureForInput(UTexture* Texture, FString& OutError)
+{
+	if (!Texture)
+	{
+		OutError = TEXT("No texture given.");
+		return FString();
+	}
+	UTexture2D* Texture2D = Cast<UTexture2D>(Texture);
+	if (const FString* Known = Texture2D ? ComfyRuntimePrivate::LoadedTextureFiles().Find(Texture2D) : nullptr)
+	{
+		if (FPaths::FileExists(*Known))
+		{
+			return *Known;
+		}
+	}
+
+	FImage Image;
+	bool bHaveImage = false;
+	if (UTextureRenderTarget* Target = Cast<UTextureRenderTarget>(Texture))
+	{
+		bHaveImage = FImageUtils::GetRenderTargetImage(Target, Image);
+	}
+	else if (Texture2D)
+	{
+		// The source art, which only the editor keeps.
+		bHaveImage = FImageUtils::GetTexture2DSourceImage(Texture2D, Image);
+	}
+	if (!bHaveImage)
+	{
+		OutError = FString::Printf(TEXT("Can't read the pixels of %s. Use a render target, a texture from Load Texture From File or Job, or a texture asset in the editor."), *Texture->GetName());
+		return FString();
+	}
+
+	const FString Folder = FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir() / TEXT("Comfy") / TEXT("Inputs"));
+	IFileManager::Get().MakeDirectory(*Folder, true);
+	const FString Path = Folder / FString::Printf(TEXT("%s-%s.png"), *Texture->GetName(), *FGuid::NewGuid().ToString(EGuidFormats::Digits).Left(8).ToLower());
+	if (!FImageUtils::SaveImageByExtension(*Path, Image))
+	{
+		OutError = FString::Printf(TEXT("Couldn't write %s."), *Path);
+		return FString();
+	}
+	return Path;
 }
 
 const FComfyOutputFile* UComfyRuntimeLibrary::FindOutput(const UComfyJob* Job, const FString& OutputName, EComfyOutputKind Kind)
