@@ -10,6 +10,7 @@
 class UComfyJob;
 class UComfyWorkflow;
 class IComfyBackend;
+class IComfyPageChannel;
 
 DECLARE_DYNAMIC_DELEGATE_OneParam(FComfyBackendStatusDelegate, const FComfyBackendStatus&, Status);
 DECLARE_DYNAMIC_DELEGATE_TwoParams(FComfyTextResultDelegate, bool, bSuccess, const FString&, Text);
@@ -17,6 +18,7 @@ DECLARE_MULTICAST_DELEGATE_OneParam(FOnComfyJobAdded, UComfyJob*);
 DECLARE_MULTICAST_DELEGATE_OneParam(FOnComfyBackendStatus, const FComfyBackendStatus&);
 DECLARE_MULTICAST_DELEGATE(FOnComfyActiveBackendChanged);
 DECLARE_MULTICAST_DELEGATE(FOnComfyServerWorkflowsChanged);
+DECLARE_MULTICAST_DELEGATE_OneParam(FOnComfyCloudAccountChanged, const FComfyCloudAccount&);
 
 /**
  * Entry point for running Comfy workflows from C++, Blueprints and Python, in the editor
@@ -138,6 +140,21 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Comfy|Jobs")
 	void ClearFinishedJobs();
 
+	/** The Comfy account signed in to Comfy Studio's Comfy Cloud page, with its free runs and credits. */
+	UFUNCTION(BlueprintPure, Category = "Comfy|Backends")
+	FComfyCloudAccount GetCloudAccount() const { return CloudAccount; }
+
+	/** Ask the signed-in Comfy Cloud page to read the account again, for example after a run. */
+	UFUNCTION(BlueprintCallable, Category = "Comfy|Backends")
+	void RefreshCloudAccount();
+
+	/** Called by the editor when the Comfy Cloud page reports the account. Updates Comfy Cloud's status. */
+	void SetCloudAccount(const FComfyCloudAccount& Account);
+
+	/** The signed-in page Comfy Cloud runs go through when there's no API key. Set by Comfy Studio. */
+	void SetPageChannel(TSharedPtr<IComfyPageChannel> Channel);
+	TSharedPtr<IComfyPageChannel> GetPageChannel() const { return PageChannel; }
+
 	FString ResolveApiKey(const FComfyBackendProfile& Profile) const;
 
 	// C++ forms of the Router queries, which report errors as well as results.
@@ -148,8 +165,22 @@ public:
 	FOnComfyBackendStatus OnBackendStatus;
 	FOnComfyActiveBackendChanged OnActiveBackendChanged;
 	FOnComfyServerWorkflowsChanged OnServerWorkflowsChanged;
+	FOnComfyCloudAccountChanged OnCloudAccountChanged;
+	/** Comfy Studio answers this by asking its Comfy Cloud page for the account again. */
+	FSimpleMulticastDelegate OnCloudAccountRefreshRequested;
 
 private:
+	/**
+	 * For a local profile that may look for ComfyUI, find an address that answers. bSearch tries every
+	 * candidate; otherwise a remembered address is used as is. Done gets the profile with the address
+	 * that answered, or the configured one and a reason when none did.
+	 */
+	void ResolveLocalProfile(const FComfyBackendProfile& Configured, bool bSearch, TFunction<void(const FComfyBackendProfile& Resolved, const FString& NotFound, EComfyDesktopInstall Desktop)> Done);
+	void StartJob(UComfyJob* Job, const FComfyBackendProfile& Profile);
+	/** Status as shown: Comfy Cloud's gets the signed-in account. */
+	FComfyBackendStatus Decorate(const FComfyBackendStatus& Raw) const;
+	void BroadcastCloudStatuses();
+
 	UComfyJob* NewJob(FName Backend, const FString& Title);
 	bool FindRouterProfile(FName Backend, FComfyBackendProfile& OutProfile) const;
 	TSharedPtr<IComfyBackend> GetOrCreateBackend(const FComfyBackendProfile& Profile);
@@ -176,4 +207,8 @@ private:
 	TMap<FName, FComfyBackendStatus> Statuses;
 	FString SessionApiKey;
 	FName SessionActiveBackend;
+	/** Local profiles' addresses that last answered, when they differ from the configured one. */
+	TMap<FName, FString> ResolvedUrls;
+	FComfyCloudAccount CloudAccount;
+	TSharedPtr<IComfyPageChannel> PageChannel;
 };

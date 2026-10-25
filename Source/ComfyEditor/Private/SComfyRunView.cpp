@@ -20,6 +20,8 @@
 #include "Components/StaticMeshComponent.h"
 #include "Framework/Application/SlateApplication.h"
 #include "Framework/Notifications/NotificationManager.h"
+#include "HAL/PlatformProcess.h"
+#include "ISettingsModule.h"
 #include "IContentBrowserSingleton.h"
 #include "Materials/MaterialInstanceConstant.h"
 #include "Misc/Paths.h"
@@ -98,6 +100,8 @@ using namespace ComfyRunViewPrivate;
 void SComfyRunView::Construct(const FArguments& InArgs)
 {
 	OnOpenInGraph = InArgs._OnOpenInGraph;
+	OnShowGraph = InArgs._OnShowGraph;
+	OnCheckBackend = InArgs._OnCheckBackend;
 	DestinationFolder = GetDefault<UComfySettings>()->DefaultImportFolder;
 
 	ChildSlot
@@ -325,9 +329,134 @@ TSharedRef<SWidget> SComfyRunView::BuildPickerMenu()
 		];
 }
 
+TSharedPtr<SWidget> SComfyRunView::MakeWelcomeCard() const
+{
+	UComfySubsystem* Comfy = UComfySubsystem::Get();
+	FComfyBackendProfile Profile;
+	if (!Comfy || !ActiveStatus.IsSet() || ActiveStatus->bReachable || ActiveStatus->Backend != Comfy->GetActiveBackend() || !Comfy->GetBackendProfile(NAME_None, Profile))
+	{
+		return nullptr;
+	}
+	const FComfyBackendStatus& Active = ActiveStatus.GetValue();
+
+	// The first backend of each kind, for "use ... instead".
+	FName CloudName, LocalName;
+	for (const FName Name : Comfy->GetBackendNames())
+	{
+		FComfyBackendProfile Other;
+		if (Name != Profile.Name && Comfy->GetBackendProfile(Name, Other))
+		{
+			if (Other.Kind == EComfyBackendKind::Cloud && CloudName.IsNone())
+			{
+				CloudName = Name;
+			}
+			if (Other.Kind == EComfyBackendKind::Local && LocalName.IsNone())
+			{
+				LocalName = Name;
+			}
+		}
+	}
+
+	TSharedRef<SWrapBox> Buttons = SNew(SWrapBox).UseAllottedSize(true).InnerSlotPadding(FVector2D(8.f, 8.f));
+	auto AddButton = [&Buttons](const FText& Label, TFunction<void()> OnClick, FName StyleName)
+	{
+		Buttons->AddSlot()[Button(Label, FOnClicked::CreateLambda([OnClick]() { OnClick(); return FReply::Handled(); }), StyleName)];
+	};
+	auto UseBackend = [](FName Name) { return [Name]() { UComfySubsystem::Get()->SetActiveBackend(Name, true); }; };
+	auto ShowSettings = [](FName Container, FName Section) { return [Container, Section]() { FModuleManager::LoadModuleChecked<ISettingsModule>("Settings").ShowViewer(Container, "Plugins", Section); }; };
+	const FSimpleDelegate CheckBackend = OnCheckBackend;
+	const FSimpleDelegate ShowGraph = OnShowGraph;
+
+	FText Title;
+	FText Body;
+	FText Detail;
+	if (Profile.Kind == EComfyBackendKind::Local)
+	{
+		Title = LOCTEXT("WelcomeLocalTitle", "Connect Comfy");
+		switch (Active.DesktopInstall)
+		{
+		case EComfyDesktopInstall::NoLocal:
+			Body = LOCTEXT("WelcomeNoLocal", "Comfy Desktop is installed, but it only has Comfy Cloud. Add a local ComfyUI in Comfy Desktop to run on your own GPU, or use Comfy Cloud here.");
+			break;
+		case EComfyDesktopInstall::HasLocal:
+			Body = LOCTEXT("WelcomeNotRunning", "Comfy Desktop has a local ComfyUI, but it isn't running. Start it in Comfy Desktop, then try again.");
+			break;
+		default:
+			Body = LOCTEXT("WelcomeNothing", "Run workflows on your own GPU with Comfy Desktop, or on Comfy Cloud from any computer.");
+			break;
+		}
+		Detail = FText::FromString(Active.Summary);
+		if (!CloudName.IsNone())
+		{
+			AddButton(LOCTEXT("UseCloud", "Use Comfy Cloud"), UseBackend(CloudName), "Comfy.Button.Primary");
+		}
+		if (Active.DesktopInstall != EComfyDesktopInstall::HasLocal)
+		{
+			AddButton(LOCTEXT("GetDesktop", "Get Comfy Desktop"), []() { FPlatformProcess::LaunchURL(TEXT("https://www.comfy.org/download"), nullptr, nullptr); }, "Comfy.Button");
+		}
+		AddButton(LOCTEXT("TryAgain", "Try again"), [CheckBackend]() { CheckBackend.ExecuteIfBound(); }, "Comfy.Button");
+		AddButton(LOCTEXT("ConnectUrl", "Connect to a URL..."), ShowSettings("Project", "ComfySettings"), "Comfy.Button.Ghost");
+	}
+	else if (Active.bNeedsSignIn)
+	{
+		Title = LOCTEXT("WelcomeSignInTitle", "Sign in to Comfy Cloud");
+		Body = LOCTEXT("WelcomeSignIn", "Run workflows on Comfy Cloud with your Comfy account. No GPU needed, and new accounts get free runs.");
+		AddButton(LOCTEXT("SignIn", "Sign in"), [ShowGraph]() { ShowGraph.ExecuteIfBound(); }, "Comfy.Button.Primary");
+		AddButton(LOCTEXT("UseKey", "Use an API key instead"), ShowSettings("Editor", "ComfyUserSettings"), "Comfy.Button");
+		if (!LocalName.IsNone())
+		{
+			AddButton(LOCTEXT("UseDesktop", "Use Comfy Desktop instead"), UseBackend(LocalName), "Comfy.Button.Ghost");
+		}
+	}
+	else
+	{
+		Title = FText::Format(LOCTEXT("WelcomeOtherTitle", "{0} isn't connected"), FText::FromName(Profile.Name));
+		Body = FText::FromString(Active.Summary);
+		AddButton(LOCTEXT("TryAgain", "Try again"), [CheckBackend]() { CheckBackend.ExecuteIfBound(); }, "Comfy.Button.Primary");
+		AddButton(LOCTEXT("Settings", "Settings"), ShowSettings("Project", "ComfySettings"), "Comfy.Button.Ghost");
+	}
+
+	return SNew(SBox)
+		.MaxDesiredWidth(620.f)
+		.HAlign(HAlign_Left)
+		[
+			Card(
+				SNew(SVerticalBox)
+				+ SVerticalBox::Slot().AutoHeight().Padding(0, 0, 0, 10)
+				[
+					SNew(SHorizontalBox)
+					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0, 0, 12, 0)
+					[
+						SNew(SBox).WidthOverride(32.f).HeightOverride(32.f)[SNew(SImage).Image(Style().GetBrush("ComfyUnreal.Icon"))]
+					]
+					+ SHorizontalBox::Slot().FillWidth(1.f).VAlign(VAlign_Center)
+					[
+						SNew(STextBlock).TextStyle(&Style(), "Comfy.Text.Large").Text(Title)
+					]
+				]
+				+ SVerticalBox::Slot().AutoHeight().Padding(0, 0, 0, 6)
+				[
+					SNew(STextBlock).TextStyle(&Style(), "Comfy.Text").AutoWrapText(true).Text(Body)
+				]
+				+ SVerticalBox::Slot().AutoHeight().Padding(0, 0, 0, 14)
+				[
+					SNew(STextBlock).TextStyle(&Style(), "Comfy.Text.Muted").AutoWrapText(true).Text(Detail)
+					.Visibility(Detail.IsEmpty() ? EVisibility::Collapsed : EVisibility::Visible)
+				]
+				+ SVerticalBox::Slot().AutoHeight()
+				[
+					Buttons
+				], 20.f)
+		];
+}
+
 void SComfyRunView::RebuildEmptyState()
 {
 	EmptyStateBox->ClearChildren();
+	if (const TSharedPtr<SWidget> Welcome = MakeWelcomeCard())
+	{
+		EmptyStateBox->AddSlot().AutoHeight().Padding(4, 4, 4, 20)[Welcome.ToSharedRef()];
+	}
 	EmptyStateBox->AddSlot().AutoHeight().Padding(4, 4, 4, 2)
 	[
 		SNew(STextBlock).TextStyle(&Style(), "Comfy.Text.Large").Text(LOCTEXT("EmptyTitle", "What do you want to make?"))
@@ -411,26 +540,51 @@ void SComfyRunView::SelectWorkflow(UComfyWorkflow* Workflow)
 void SComfyRunView::HandleBackendStatus(const FComfyBackendStatus& BackendStatus)
 {
 	const UComfySubsystem* Comfy = UComfySubsystem::Get();
+	if (Comfy && BackendStatus.Backend == Comfy->GetActiveBackend())
+	{
+		ActiveStatus = BackendStatus;
+		const FString Key = BackendStatus.bReachable ? FString() : FString::Printf(TEXT("%s|%d|%d|%s"), *BackendStatus.Backend.ToString(),
+			int32(BackendStatus.DesktopInstall), BackendStatus.bNeedsSignIn ? 1 : 0, *BackendStatus.Summary);
+		if (Key != WelcomeKey)
+		{
+			WelcomeKey = Key;
+			RebuildEmptyState();
+		}
+	}
 	const UComfyWorkflow* Workflow = SelectedWorkflow.Get();
 	if (!Comfy || !Workflow || BackendStatus.Backend != Comfy->GetActiveBackend())
 	{
 		return;
 	}
-	// New model lists: keep a choice the backend has, otherwise take its best match.
+	// New model lists: keep a choice the backend has, otherwise take its best match. Rebuild the form
+	// only when a list changed, so status updates (such as credits after a run) don't reset what's being typed.
+	FString Signature = BackendStatus.Backend.ToString();
+	bool bValueChanged = false;
 	for (const FComfyWorkflowInput& Input : Workflow->Inputs)
 	{
-		if (Input.Type != EComfyInputType::Model)
+		if (Input.Type != EComfyInputType::Model && Input.Type != EComfyInputType::Enum)
 		{
 			continue;
 		}
 		const TArray<FString> Options = Comfy->GetInputOptions(NAME_None, Workflow, Input.Name);
+		Signature += FString::Printf(TEXT("|%s:%d:%s"), *Input.Name, Options.Num(), Options.Num() > 0 ? *Options[0] : TEXT(""));
+		if (Input.Type != EComfyInputType::Model)
+		{
+			continue;
+		}
 		const FString* Current = InputValues.Find(Input.Name);
 		if (!Current || !Options.Contains(*Current))
 		{
-			InputValues.Add(Input.Name, Comfy->GetDefaultInputValue(NAME_None, Workflow, Input.Name));
+			const FString Default = Comfy->GetDefaultInputValue(NAME_None, Workflow, Input.Name);
+			bValueChanged |= !Current || *Current != Default;
+			InputValues.Add(Input.Name, Default);
 		}
 	}
-	RebuildForm();
+	if (bValueChanged || Signature != FormOptionsSignature)
+	{
+		FormOptionsSignature = Signature;
+		RebuildForm();
+	}
 }
 
 // Input cards --------------------------------------------------------------------------------

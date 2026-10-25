@@ -154,3 +154,32 @@ namespace ComfyTypes
 		}
 	}
 }
+
+FString FComfyCloudAccount::Describe() const
+{
+	if (!bSignedIn)
+	{
+		return TEXT("Not signed in");
+	}
+	const FString& Who = DisplayName.IsEmpty() ? Email : DisplayName;
+	FString Text = Who.IsEmpty() ? FString(TEXT("Signed in")) : FString::Printf(TEXT("Signed in as %s"), *Who);
+	if (!Workspace.IsEmpty())
+	{
+		Text += FString::Printf(TEXT(" (%s)"), *Workspace);
+	}
+	if (FreeRunsAllowance > 0)
+	{
+		Text += FString::Printf(TEXT("  ·  %d of %d free runs left"), FMath::Max(FreeRunsRemaining, 0), FreeRunsAllowance);
+	}
+	if (Credits >= 0.0)
+	{
+		Text += FString::Printf(TEXT("  ·  %s credits"), *FText::AsNumber(FMath::FloorToInt64(Credits)).ToString());
+	}
+	return Text;
+}
+
+bool FComfyCloudAccount::operator==(const FComfyCloudAccount& Other) const
+{
+	return bSignedIn == Other.bSignedIn && DisplayName == Other.DisplayName && Email == Other.Email && Workspace == Other.Workspace
+		&& FreeRunsRemaining == Other.FreeRunsRemaining && FreeRunsAllowance == Other.FreeRunsAllowance && Credits == Other.Credits;
+}

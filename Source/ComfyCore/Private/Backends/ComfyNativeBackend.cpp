@@ -14,6 +14,52 @@
 #include "Misc/Guid.h"
 #include "Misc/Paths.h"
 
+namespace ComfyBackendShared
+{
+	TArray<FComfyOutputFile> CollectOutputs(UComfyJob* Job, const TSharedPtr<FJsonObject>& NodeOutputs)
+	{
+		TArray<FComfyOutputFile> Saved;
+		TArray<FComfyOutputFile> Previews;
+		for (const TPair<FString, TSharedPtr<FJsonValue>>& NodePair : NodeOutputs->Values)
+		{
+			const TSharedPtr<FJsonObject> NodeObject = NodePair.Value->AsObject();
+			if (!NodeObject.IsValid())
+			{
+				continue;
+			}
+			const FComfyWorkflowOutput* Manifest = Job->Workflow ? Job->Workflow->FindOutputForNode(NodePair.Key) : nullptr;
+			for (const TPair<FString, TSharedPtr<FJsonValue>>& Field : NodeObject->Values)
+			{
+				if (Field.Value->Type != EJson::Array)
+				{
+					continue;
+				}
+				for (const TSharedPtr<FJsonValue>& Item : Field.Value->AsArray())
+				{
+					const TSharedPtr<FJsonObject> FileObject = Item->AsObject();
+					FString FileName;
+					if (!FileObject.IsValid() || !FileObject->TryGetStringField(TEXT("filename"), FileName))
+					{
+						continue;
+					}
+					FComfyOutputFile File;
+					File.NodeId = NodePair.Key;
+					File.FileName = FileName;
+					File.RemoteRef = FileName;
+					FileObject->TryGetStringField(TEXT("subfolder"), File.RemoteSubfolder);
+					FileObject->TryGetStringField(TEXT("type"), File.RemoteType);
+					File.Kind = ComfyTypes::KindFromFileName(FileName);
+					File.Name = Manifest ? Manifest->Name : NodePair.Key;
+					File.ImportRule = Manifest ? Manifest->ImportRule : EComfyImportRule::Auto;
+					File.LocalPath = Job->GetOutputDirectory() / FileName;
+					(File.RemoteType == TEXT("output") || Manifest ? Saved : Previews).Add(File);
+				}
+			}
+		}
+		return Saved.Num() > 0 ? Saved : Previews;
+	}
+}
+
 FComfyNativeBackend::FComfyNativeBackend(const FComfyBackendProfile& InProfile, const FString& InApiKey)
 	: IComfyBackend(InProfile, InApiKey)
 	, ClientId(FGuid::NewGuid().ToString(EGuidFormats::DigitsWithHyphensLower))
@@ -333,45 +379,7 @@ void FComfyNativeBackend::Poll(UComfyJob* Job, FPollCallback Callback)
 			return;
 		}
 
-		TArray<FComfyOutputFile> Saved;
-		TArray<FComfyOutputFile> Previews;
-		for (const TPair<FString, TSharedPtr<FJsonValue>>& NodePair : (*NodeOutputs)->Values)
-		{
-			const TSharedPtr<FJsonObject> NodeObject = NodePair.Value->AsObject();
-			if (!NodeObject.IsValid())
-			{
-				continue;
-			}
-			const FComfyWorkflowOutput* Manifest = Job->Workflow ? Job->Workflow->FindOutputForNode(NodePair.Key) : nullptr;
-			for (const TPair<FString, TSharedPtr<FJsonValue>>& Field : NodeObject->Values)
-			{
-				if (Field.Value->Type != EJson::Array)
-				{
-					continue;
-				}
-				for (const TSharedPtr<FJsonValue>& Item : Field.Value->AsArray())
-				{
-					const TSharedPtr<FJsonObject> FileObject = Item->AsObject();
-					FString FileName;
-					if (!FileObject.IsValid() || !FileObject->TryGetStringField(TEXT("filename"), FileName))
-					{
-						continue;
-					}
-					FComfyOutputFile File;
-					File.NodeId = NodePair.Key;
-					File.FileName = FileName;
-					File.RemoteRef = FileName;
-					FileObject->TryGetStringField(TEXT("subfolder"), File.RemoteSubfolder);
-					FileObject->TryGetStringField(TEXT("type"), File.RemoteType);
-					File.Kind = ComfyTypes::KindFromFileName(FileName);
-					File.Name = Manifest ? Manifest->Name : NodePair.Key;
-					File.ImportRule = Manifest ? Manifest->ImportRule : EComfyImportRule::Auto;
-					File.LocalPath = Job->GetOutputDirectory() / FileName;
-					(File.RemoteType == TEXT("output") || Manifest ? Saved : Previews).Add(File);
-				}
-			}
-		}
-		Job->Outputs = Saved.Num() > 0 ? Saved : Previews;
+		Job->Outputs = ComfyBackendShared::CollectOutputs(Job, *NodeOutputs);
 		Callback(EComfyPollResult::Done, FString(), 0.f);
 	}, 30.f);
 }

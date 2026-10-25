@@ -18,6 +18,8 @@ class UComfyWorkflow;
  * Comfy Studio's Graph view: the ComfyUI frontend of the active backend (a local ComfyUI or Comfy
  * Desktop, or Comfy Cloud) in an embedded browser, with a bridge to move graphs between it and Unreal.
  */
+class FComfyGraphPageChannel;
+
 class SComfyGraph : public SCompoundWidget
 {
 public:
@@ -29,6 +31,7 @@ public:
 	SLATE_END_ARGS()
 
 	void Construct(const FArguments& InArgs);
+	virtual ~SComfyGraph() override;
 
 	/** Load the active backend's frontend, creating the browser on first use or when the backend changed. */
 	void Activate();
@@ -48,7 +51,12 @@ private:
 	FReply OnOpenInBrowser();
 
 	void HandleGraph(const FString& WorkflowJson, const FString& ApiJson, const FString& Name);
+	void HandleAccount(const FString& AccountJson);
+	void HandleLoadStarted();
 	void HandleLoadCompleted();
+	bool IsCloudPage() const;
+	/** The page bridge script from Resources/Bridge, read once. */
+	const FString& GetBridgeScript();
 	bool HandleCreateWindow(const TWeakPtr<IWebBrowserWindow>& NewWindow, const TWeakPtr<IWebBrowserPopupFeatures>& Features);
 	bool HandleCloseWindow(const TWeakPtr<IWebBrowserWindow>& ClosingWindow);
 
@@ -62,6 +70,10 @@ private:
 	/** A workflow asked for before the page finished loading; opened once it has. */
 	TWeakObjectPtr<const UComfyWorkflow> PendingWorkflow;
 	TStrongObjectPtr<UComfyGraphBridge> Bridge;
+	/** Lets Comfy Core run calls in this page: Comfy Cloud jobs without an API key. */
+	TSharedPtr<FComfyGraphPageChannel> Channel;
+	FString BridgeScript;
+	FDelegateHandle RefreshAccountHandle;
 
 	FText Message;
 	bool bMessageIsError = false;

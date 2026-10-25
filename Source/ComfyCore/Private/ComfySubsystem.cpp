@@ -5,6 +5,8 @@
 #include "ComfyJob.h"
 #include "ComfySettings.h"
 #include "ComfyWorkflow.h"
+#include "ComfyLocalDetect.h"
+#include "ComfyPageChannel.h"
 #include "Backends/ComfyBackend.h"
 #include "Backends/ComfyHttp.h"
 #include "Dom/JsonObject.h"
@@ -59,9 +61,60 @@ bool UComfySubsystem::GetBackendProfile(FName Backend, FComfyBackendProfile& Out
 	if (const FComfyBackendProfile* Found = GetDefault<UComfySettings>()->FindBackend(Backend.IsNone() ? GetActiveBackend() : Backend))
 	{
 		OutProfile = *Found;
+		// A local ComfyUI found on another port stands in for the configured address.
+		if (const FString* Resolved = ResolvedUrls.Find(Found->Name))
+		{
+			OutProfile.BaseUrl = *Resolved;
+		}
 		return true;
 	}
 	return false;
+}
+
+void UComfySubsystem::ResolveLocalProfile(const FComfyBackendProfile& Configured, bool bSearch, TFunction<void(const FComfyBackendProfile&, const FString&, EComfyDesktopInstall)> Done)
+{
+	if (Configured.Kind != EComfyBackendKind::Local || !Configured.bFindLocalComfy)
+	{
+		Done(Configured, FString(), EComfyDesktopInstall::Unknown);
+		return;
+	}
+	const FString* Remembered = ResolvedUrls.Find(Configured.Name);
+	if (!bSearch && Remembered)
+	{
+		FComfyBackendProfile Resolved = Configured;
+		Resolved.BaseUrl = *Remembered;
+		Done(Resolved, FString(), EComfyDesktopInstall::Unknown);
+		return;
+	}
+
+	const ComfyLocalDetect::FDesktopInfo Desktop = ComfyLocalDetect::ReadDesktop();
+	const TArray<FString> Urls = ComfyLocalDetect::Candidates(Remembered ? *Remembered : FString(), Configured.BaseUrl, Desktop);
+	TWeakObjectPtr<UComfySubsystem> WeakThis = this;
+	ComfyLocalDetect::FindFirst(Urls, [WeakThis, Configured, Desktop, Urls, Done = MoveTemp(Done)](const FString& Found)
+	{
+		UComfySubsystem* This = WeakThis.Get();
+		FComfyBackendProfile Resolved = Configured;
+		Resolved.BaseUrl.RemoveFromEnd(TEXT("/"));
+		if (Found.IsEmpty())
+		{
+			if (This)
+			{
+				This->ResolvedUrls.Remove(Configured.Name);
+			}
+			Done(Resolved, ComfyLocalDetect::DescribeNotFound(Desktop, Urls), Desktop.Install);
+			return;
+		}
+		if (This)
+		{
+			This->ResolvedUrls.Add(Configured.Name, Found);
+			if (Found != Resolved.BaseUrl)
+			{
+				UE_LOG(LogComfy, Log, TEXT("%s: found ComfyUI at %s"), *Configured.Name.ToString(), *Found);
+			}
+		}
+		Resolved.BaseUrl = Found;
+		Done(Resolved, FString(), Desktop.Install);
+	});
 }
 
 FName UComfySubsystem::GetActiveBackend() const
@@ -122,7 +175,9 @@ FString UComfySubsystem::ResolveApiKey(const FComfyBackendProfile& Profile) cons
 TSharedPtr<IComfyBackend> UComfySubsystem::GetOrCreateBackend(const FComfyBackendProfile& Profile)
 {
 	const FString Key = ResolveApiKey(Profile);
-	const FString Fingerprint = FString::Printf(TEXT("%d|%s|%d|%d|%s"), int32(Profile.Kind), *Profile.BaseUrl, int32(Profile.LocalProtocol), Profile.bSendPartnerNodeKey ? 1 : 0, *FMD5::HashAnsiString(*Key));
+	// Comfy Cloud without a key runs through the signed-in Comfy Studio page.
+	const bool bViaPage = Profile.Kind == EComfyBackendKind::Cloud && Key.IsEmpty() && PageChannel.IsValid();
+	const FString Fingerprint = FString::Printf(TEXT("%d|%s|%d|%d|%s|%d"), int32(Profile.Kind), *Profile.BaseUrl, int32(Profile.LocalProtocol), Profile.bSendPartnerNodeKey ? 1 : 0, *FMD5::HashAnsiString(*Key), bViaPage ? 1 : 0);
 	if (TSharedPtr<IComfyBackend>* Existing = BackendInstances.Find(Profile.Name))
 	{
 		if (BackendFingerprints.FindRef(Profile.Name) == Fingerprint)
@@ -131,7 +186,11 @@ TSharedPtr<IComfyBackend> UComfySubsystem::GetOrCreateBackend(const FComfyBacken
 		}
 	}
 	TSharedPtr<IComfyBackend> Backend;
-	if (Profile.UsesApiV2())
+	if (bViaPage)
+	{
+		Backend = MakeShared<FComfyPageBackend>(Profile, PageChannel.ToSharedRef());
+	}
+	else if (Profile.UsesApiV2())
 	{
 		Backend = MakeShared<FComfyApiV2Backend>(Profile, Key);
 	}
@@ -157,11 +216,13 @@ void UComfySubsystem::ProbeBackend(FName Backend, FComfyBackendStatusDelegate On
 	}
 
 	TWeakObjectPtr<UComfySubsystem> WeakThis = this;
-	auto Finish = [WeakThis, OnStatus](const FComfyBackendStatus& Status)
+	auto Finish = [WeakThis, OnStatus](const FComfyBackendStatus& Raw)
 	{
+		FComfyBackendStatus Status = Raw;
 		if (UComfySubsystem* This = WeakThis.Get())
 		{
-			This->Statuses.Add(Status.Backend, Status);
+			This->Statuses.Add(Raw.Backend, Raw);
+			Status = This->Decorate(Raw);
 			This->OnBackendStatus.Broadcast(Status);
 		}
 		OnStatus.ExecuteIfBound(Status);
@@ -187,14 +248,146 @@ void UComfySubsystem::ProbeBackend(FName Backend, FComfyBackendStatusDelegate On
 		return;
 	}
 
-	GetOrCreateBackend(Profile)->Probe(Finish);
+	if (Profile.Kind == EComfyBackendKind::Local)
+	{
+		// Probe the configured address and the usual local ports, then talk to whichever answered.
+		const FComfyBackendProfile* Configured = GetDefault<UComfySettings>()->FindBackend(Profile.Name);
+		ResolveLocalProfile(Configured ? *Configured : Profile, true, [WeakThis, Finish](const FComfyBackendProfile& Resolved, const FString& NotFound, EComfyDesktopInstall Desktop)
+		{
+			UComfySubsystem* This = WeakThis.Get();
+			if (!This)
+			{
+				return;
+			}
+			if (!NotFound.IsEmpty())
+			{
+				FComfyBackendStatus Status;
+				Status.Backend = Resolved.Name;
+				Status.Url = Resolved.BaseUrl;
+				Status.Summary = NotFound;
+				Status.DesktopInstall = Desktop;
+				Finish(Status);
+				return;
+			}
+			This->GetOrCreateBackend(Resolved)->Probe([Finish, Resolved, Desktop](const FComfyBackendStatus& Probed)
+			{
+				FComfyBackendStatus Status = Probed;
+				Status.Url = Resolved.BaseUrl;
+				Status.DesktopInstall = Desktop;
+				if (Status.bReachable)
+				{
+					Status.Summary = FString::Printf(TEXT("%s  ·  %s"), *ComfyLocalDetect::HostPort(Resolved.BaseUrl), *Status.Summary);
+				}
+				Finish(Status);
+			});
+		});
+		return;
+	}
+
+	GetOrCreateBackend(Profile)->Probe([Finish, Url = Profile.BaseUrl](const FComfyBackendStatus& Probed)
+	{
+		FComfyBackendStatus Status = Probed;
+		Status.Url = Url;
+		Finish(Status);
+	});
+}
+
+FComfyBackendStatus UComfySubsystem::Decorate(const FComfyBackendStatus& Raw) const
+{
+	FComfyBackendProfile Profile;
+	if (!GetBackendProfile(Raw.Backend, Profile) || Profile.Kind != EComfyBackendKind::Cloud)
+	{
+		return Raw;
+	}
+	FComfyBackendStatus Status = Raw;
+	if (!ResolveApiKey(Profile).IsEmpty())
+	{
+		// The key does the work; the signed-in page, if any, still knows the free runs and credits.
+		if (CloudAccount.bSignedIn)
+		{
+			Status.Summary += TEXT("  ·  ") + CloudAccount.Describe();
+		}
+		return Status;
+	}
+	if (!CloudAccount.bSignedIn)
+	{
+		Status.bReachable = false;
+		Status.bNeedsSignIn = true;
+		Status.Summary = TEXT("Not signed in. Sign in to Comfy Cloud, or add an API key in Editor Preferences > Plugins > Comfy.");
+		return Status;
+	}
+	Status.bNeedsSignIn = false;
+	Status.Summary = CloudAccount.Describe();
+	if (!Raw.bReachable)
+	{
+		// Signed in moments ago: the check that follows hasn't finished yet.
+		Status.Summary += Raw.bNeedsSignIn ? FString(TEXT("  ·  Checking...")) : TEXT("  ·  ") + Raw.Summary;
+	}
+	return Status;
+}
+
+void UComfySubsystem::SetCloudAccount(const FComfyCloudAccount& Account)
+{
+	const bool bSignInChanged = Account.bSignedIn != CloudAccount.bSignedIn || Account.Email != CloudAccount.Email;
+	const bool bChanged = Account != CloudAccount;
+	CloudAccount = Account;
+	if (!bChanged)
+	{
+		return;
+	}
+	OnCloudAccountChanged.Broadcast(CloudAccount);
+	if (bSignInChanged)
+	{
+		// Signing in or out changes what a key-less Cloud backend can do: check it again, which also reads its models.
+		for (const FComfyBackendProfile& Profile : GetDefault<UComfySettings>()->Backends)
+		{
+			if (Profile.Kind == EComfyBackendKind::Cloud && ResolveApiKey(Profile).IsEmpty())
+			{
+				ProbeBackend(Profile.Name, FComfyBackendStatusDelegate());
+			}
+		}
+	}
+	BroadcastCloudStatuses();
+}
+
+void UComfySubsystem::BroadcastCloudStatuses()
+{
+	for (const FComfyBackendProfile& Profile : GetDefault<UComfySettings>()->Backends)
+	{
+		if (Profile.Kind == EComfyBackendKind::Cloud)
+		{
+			if (const FComfyBackendStatus* Raw = Statuses.Find(Profile.Name))
+			{
+				OnBackendStatus.Broadcast(Decorate(*Raw));
+			}
+		}
+	}
+}
+
+void UComfySubsystem::RefreshCloudAccount()
+{
+	OnCloudAccountRefreshRequested.Broadcast();
+}
+
+void UComfySubsystem::SetPageChannel(TSharedPtr<IComfyPageChannel> Channel)
+{
+	PageChannel = Channel;
+	// Key-less Cloud backends run through the page, so they're rebuilt around the new one.
+	for (const FComfyBackendProfile& Profile : GetDefault<UComfySettings>()->Backends)
+	{
+		if (Profile.Kind == EComfyBackendKind::Cloud)
+		{
+			BackendInstances.Remove(Profile.Name);
+			BackendFingerprints.Remove(Profile.Name);
+		}
+	}
 }
 
 FComfyBackendStatus UComfySubsystem::GetLastStatus(FName Backend) const
 {
 	if (const FComfyBackendStatus* Found = Statuses.Find(Backend.IsNone() ? GetActiveBackend() : Backend))
 	{
-		return *Found;
+		return Decorate(*Found);
 	}
 	FComfyBackendStatus Unknown;
 	Unknown.Backend = Backend;
@@ -293,6 +486,15 @@ UComfyJob* UComfySubsystem::NewJob(FName Backend, const FString& Title)
 	Job->Backend = Backend;
 	Job->Title = Title;
 	Job->CreatedAt = FDateTime::UtcNow();
+	// Cloud runs spend free runs or credits, so the account shown in Comfy Studio is read again.
+	TWeakObjectPtr<UComfySubsystem> WeakThis = this;
+	Job->OnFinishedNative.AddLambda([WeakThis](UComfyJob* Finished)
+	{
+		if (Finished && Finished->BackendKind == EComfyBackendKind::Cloud && WeakThis.IsValid())
+		{
+			WeakThis->RefreshCloudAccount();
+		}
+	});
 	Jobs.Add(Job);
 	OnJobAdded.Broadcast(Job);
 	return Job;
@@ -353,22 +555,54 @@ UComfyJob* UComfySubsystem::RunWorkflow(UComfyWorkflow* Workflow, const TMap<FSt
 		Job->Fail(FString::Printf(TEXT("%s doesn't have these nodes: %s. Install them (ComfyUI Manager) or run on another backend."), *BackendName.ToString(), *FString::Join(Missing, TEXT(", "))));
 		return Job;
 	}
+	for (const FComfyWorkflowInput& Input : Workflow->Inputs)
+	{
+		const FString* Value = Inputs.Find(Input.Name);
+		if (Input.Type == EComfyInputType::File && Value && !Value->IsEmpty() && !FPaths::FileExists(*Value))
+		{
+			Job->Fail(FString::Printf(TEXT("Input \"%s\": file not found: %s"), *Input.Name, **Value));
+			return Job;
+		}
+	}
 
+	if (Profile.Kind == EComfyBackendKind::Local && !ResolvedUrls.Contains(Profile.Name))
+	{
+		// Nothing has found this ComfyUI yet (a script or agent ran before Comfy Studio checked), so look for it first.
+		TWeakObjectPtr<UComfyJob> WeakJob = Job;
+		TWeakObjectPtr<UComfySubsystem> WeakThis = this;
+		ResolveLocalProfile(Profile, false, [WeakJob, WeakThis](const FComfyBackendProfile& Resolved, const FString& NotFound, EComfyDesktopInstall)
+		{
+			UComfyJob* Job = WeakJob.Get();
+			UComfySubsystem* This = WeakThis.Get();
+			if (!Job || !This || Job->IsFinished())
+			{
+				return;
+			}
+			if (!NotFound.IsEmpty())
+			{
+				Job->Fail(NotFound);
+				return;
+			}
+			This->StartJob(Job, Resolved);
+		});
+		return Job;
+	}
+	StartJob(Job, Profile);
+	return Job;
+}
+
+void UComfySubsystem::StartJob(UComfyJob* Job, const FComfyBackendProfile& Profile)
+{
 	TSharedPtr<IComfyBackend> BackendImpl = GetOrCreateBackend(Profile);
 	Job->BackendImpl = BackendImpl;
 
 	// Files to upload first: File inputs given a path on disk.
 	TArray<TPair<FString, FString>> PendingFiles;
-	for (const FComfyWorkflowInput& Input : Workflow->Inputs)
+	for (const FComfyWorkflowInput& Input : Job->Workflow->Inputs)
 	{
-		const FString* Value = Inputs.Find(Input.Name);
+		const FString* Value = Job->Inputs.Find(Input.Name);
 		if (Input.Type == EComfyInputType::File && Value && !Value->IsEmpty())
 		{
-			if (!FPaths::FileExists(*Value))
-			{
-				Job->Fail(FString::Printf(TEXT("Input \"%s\": file not found: %s"), *Input.Name, **Value));
-				return Job;
-			}
 			PendingFiles.Emplace(Input.Name, *Value);
 		}
 	}
@@ -377,7 +611,6 @@ UComfyJob* UComfySubsystem::RunWorkflow(UComfyWorkflow* Workflow, const TMap<FSt
 		Job->SetState(EComfyJobState::Uploading);
 	}
 	UploadInputs(Job, BackendImpl, MoveTemp(PendingFiles), {});
-	return Job;
 }
 
 void UComfySubsystem::UploadInputs(UComfyJob* Job, TSharedPtr<IComfyBackend> Backend, TArray<TPair<FString, FString>> PendingFiles, TMap<FString, TSharedPtr<FJsonValue>> References)

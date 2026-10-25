@@ -51,6 +51,13 @@ struct COMFYCORE_API FComfyBackendProfile
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Comfy", meta = (EditCondition = "Kind == EComfyBackendKind::Local", EditConditionHides))
 	EComfyLocalProtocol LocalProtocol = EComfyLocalProtocol::Native;
 
+	/**
+	 * When the URL above doesn't answer, look for ComfyUI on this computer: ports 8000 (Comfy Desktop)
+	 * and 8188 (ComfyUI's default), and the ports set on Comfy Desktop's installations.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Comfy", meta = (EditCondition = "Kind == EComfyBackendKind::Local", EditConditionHides))
+	bool bFindLocalComfy = true;
+
 	/** Environment variable that holds this backend's API key. Checked before the per-user key in Editor Preferences. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Comfy")
 	FString ApiKeyEnvironmentVariable = TEXT("COMFY_API_KEY");
@@ -253,6 +260,20 @@ struct COMFYCORE_API FComfyProgress
 	FString Message;
 };
 
+/** What Comfy Desktop has on this computer, read from its installations list. */
+UENUM(BlueprintType)
+enum class EComfyDesktopInstall : uint8
+{
+	/** Not looked for: the backend isn't a local one. */
+	Unknown,
+	/** Comfy Desktop isn't installed. */
+	NotInstalled,
+	/** Comfy Desktop is installed but has no local ComfyUI, only Comfy Cloud. */
+	NoLocal,
+	/** Comfy Desktop has at least one local ComfyUI (or a remote connection). */
+	HasLocal,
+};
+
 /** Result of probing a backend. */
 USTRUCT(BlueprintType)
 struct COMFYCORE_API FComfyBackendStatus
@@ -269,11 +290,66 @@ struct COMFYCORE_API FComfyBackendStatus
 	UPROPERTY(BlueprintReadOnly, Category = "Comfy")
 	FString Summary;
 
+	/** The address that answered, which can differ from the profile's when a local ComfyUI was found on another port. */
+	UPROPERTY(BlueprintReadOnly, Category = "Comfy")
+	FString Url;
+
+	/** Local backends only: what Comfy Desktop has installed, for explaining why nothing answered. */
+	UPROPERTY(BlueprintReadOnly, Category = "Comfy")
+	EComfyDesktopInstall DesktopInstall = EComfyDesktopInstall::Unknown;
+
+	/** Comfy Cloud only: true when neither an API key nor a signed-in Comfy Studio page is available. */
+	UPROPERTY(BlueprintReadOnly, Category = "Comfy")
+	bool bNeedsSignIn = false;
+
 	/** Node classes the backend reports (native backends only; empty when unknown). */
 	TSet<FString> NodeClasses;
 
 	/** Choices for list inputs, keyed "NodeClass.input", from the backend's object_info. Empty when unknown. */
 	TMap<FString, TArray<FString>> InputOptions;
+};
+
+/**
+ * The Comfy account signed in to Comfy Studio's Comfy Cloud page. Read from the page itself, so it
+ * shows what Comfy Cloud shows; the sign-in token never leaves the page.
+ */
+USTRUCT(BlueprintType)
+struct COMFYCORE_API FComfyCloudAccount
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadOnly, Category = "Comfy")
+	bool bSignedIn = false;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Comfy")
+	FString DisplayName;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Comfy")
+	FString Email;
+
+	/** The active workspace when it's a team one; empty for a personal workspace. */
+	UPROPERTY(BlueprintReadOnly, Category = "Comfy")
+	FString Workspace;
+
+	/** Free runs left this period, or -1 when the account has no free-run allowance. */
+	UPROPERTY(BlueprintReadOnly, Category = "Comfy")
+	int32 FreeRunsRemaining = -1;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Comfy")
+	int32 FreeRunsAllowance = -1;
+
+	/** Comfy credits available, or -1 when unknown. */
+	UPROPERTY(BlueprintReadOnly, Category = "Comfy")
+	double Credits = -1.0;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Comfy")
+	FDateTime UpdatedAt;
+
+	/** "Signed in as Joshua · 5 of 5 free runs left · 1,200 credits", or "Not signed in". */
+	FString Describe() const;
+
+	bool operator==(const FComfyCloudAccount& Other) const;
+	bool operator!=(const FComfyCloudAccount& Other) const { return !(*this == Other); }
 };
 
 namespace ComfyTypes

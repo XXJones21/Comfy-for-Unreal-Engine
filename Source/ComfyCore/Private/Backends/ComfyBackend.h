@@ -83,6 +83,32 @@ private:
 	TMap<FString, TWeakObjectPtr<UComfyJob>> JobsByPromptId;
 };
 
+/**
+ * Comfy Cloud through the signed-in Comfy Studio page, for when there's no API key. Each call runs in
+ * the page with the page's sign-in (see IComfyPageChannel and Resources/Bridge/comfy_unreal_page.js).
+ */
+class FComfyPageBackend : public IComfyBackend
+{
+public:
+	FComfyPageBackend(const FComfyBackendProfile& InProfile, const TSharedRef<class IComfyPageChannel>& InChannel);
+
+	virtual void Probe(TFunction<void(const FComfyBackendStatus&)> Callback) override;
+	virtual void UploadFile(const FString& LocalPath, FUploadCallback Callback) override;
+	virtual void Submit(UComfyJob* Job, const TSharedRef<FJsonObject>& Graph, FResultCallback Callback) override;
+	virtual void Poll(UComfyJob* Job, FPollCallback Callback) override;
+	virtual void Download(const FComfyOutputFile& OutputFile, FResultCallback Callback) override;
+	virtual void CancelJob(UComfyJob* Job) override;
+
+private:
+	TWeakPtr<class IComfyPageChannel> Channel;
+};
+
+namespace ComfyBackendShared
+{
+	/** Files from a ComfyUI node-outputs object ({node id: {images: [{filename, subfolder, type}], ...}}), named by the job's manifest. */
+	TArray<FComfyOutputFile> CollectOutputs(UComfyJob* Job, const TSharedPtr<FJsonObject>& NodeOutputs);
+}
+
 /** Comfy API v2: Comfy Cloud, Comfy API deployments, and comfy-api-proxy. */
 class FComfyApiV2Backend : public IComfyBackend
 {

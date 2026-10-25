@@ -30,6 +30,10 @@ class SComfyRunView : public SCompoundWidget
 public:
 	SLATE_BEGIN_ARGS(SComfyRunView) {}
 		SLATE_EVENT(FOnComfyOpenInGraph, OnOpenInGraph)
+		/** Show the Graph view, where Comfy Cloud's sign-in lives. */
+		SLATE_EVENT(FSimpleDelegate, OnShowGraph)
+		/** Check the active backend again. */
+		SLATE_EVENT(FSimpleDelegate, OnCheckBackend)
 	SLATE_END_ARGS()
 
 	void Construct(const FArguments& InArgs);
@@ -56,6 +60,8 @@ private:
 
 	// Main area
 	void RebuildEmptyState();
+	/** Shown above the library while the active backend isn't connected: what's wrong and what to do. */
+	TSharedPtr<SWidget> MakeWelcomeCard() const;
 	TSharedRef<SWidget> BuildGallery();
 	void RebuildStrip();
 	TSharedRef<SWidget> MakeJobTile(UComfyJob* Job);
@@ -77,6 +83,15 @@ private:
 	static FString OriginOf(const UComfyWorkflow* Workflow);
 
 	FOnComfyOpenInGraph OnOpenInGraph;
+	FSimpleDelegate OnShowGraph;
+	FSimpleDelegate OnCheckBackend;
+
+	/** The active backend's last status, for the welcome card. */
+	TOptional<FComfyBackendStatus> ActiveStatus;
+	/** What the welcome card last showed, so it's only rebuilt when that changes. */
+	FString WelcomeKey;
+	/** The option lists the form was last built with. */
+	FString FormOptionsSignature;
 
 	TArray<TWeakObjectPtr<UComfyWorkflow>> Workflows;
 	TWeakObjectPtr<UComfyWorkflow> SelectedWorkflow;

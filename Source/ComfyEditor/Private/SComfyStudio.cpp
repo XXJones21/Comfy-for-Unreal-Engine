@@ -71,6 +71,8 @@ void SComfyStudio::Construct(const FArguments& InArgs)
 				[
 					SAssignNew(RunView, SComfyRunView)
 					.OnOpenInGraph_Lambda([this](const UComfyWorkflow* Workflow) { OpenInGraph(Workflow); })
+					.OnShowGraph_Lambda([this]() { ShowView(TEXT("Graph")); })
+					.OnCheckBackend_Lambda([this]() { CheckActiveBackend(); })
 				]
 				+ SWidgetSwitcher::Slot().Padding(8)
 				[
@@ -102,6 +104,7 @@ void SComfyStudio::Construct(const FArguments& InArgs)
 
 	RefreshBackends();
 	CheckActiveBackend();
+	LoadCloudPageIfActive();
 	Instance = SharedThis(this);
 }
 
@@ -238,6 +241,19 @@ void SComfyStudio::HandleActiveBackendChanged()
 	{
 		Graph->Activate();
 	}
+	LoadCloudPageIfActive();
+}
+
+void SComfyStudio::LoadCloudPageIfActive()
+{
+	// Comfy Cloud's sign-in lives in the Graph view's page, so it loads in the background
+	// to report the account and run jobs even while the Run view is showing.
+	FComfyBackendProfile Profile;
+	const UComfySubsystem* Comfy = UComfySubsystem::Get();
+	if (Comfy && Comfy->GetBackendProfile(NAME_None, Profile) && Profile.Kind == EComfyBackendKind::Cloud)
+	{
+		Graph->Activate();
+	}
 }
 
 void SComfyStudio::CheckActiveBackend()
@@ -254,7 +270,7 @@ void SComfyStudio::HandleBackendStatus(const FComfyBackendStatus& Status)
 	const UComfySubsystem* Comfy = UComfySubsystem::Get();
 	if (Comfy && Status.Backend == Comfy->GetActiveBackend())
 	{
-		Connection = Status.bReachable ? EConnection::Connected : EConnection::Failed;
+		Connection = Status.bReachable ? EConnection::Connected : Status.bNeedsSignIn ? EConnection::SignIn : EConnection::Failed;
 	}
 	RunView->HandleBackendStatus(Status);
 }
@@ -274,7 +290,9 @@ FText SComfyStudio::GetStatusText() const
 	case EConnection::Connected:
 		return FText::Format(LOCTEXT("Connected", "Connected  ·  {0}"), FText::FromString(Status.Summary));
 	case EConnection::Failed:
-		return FText::Format(LOCTEXT("Failed", "Connection failed  ·  {0}"), FText::FromString(Status.Summary));
+		return FText::Format(LOCTEXT("Failed", "Not connected  ·  {0}"), FText::FromString(Status.Summary));
+	case EConnection::SignIn:
+		return FText::FromString(Status.Summary);
 	default:
 		return LOCTEXT("Disconnected", "Disconnected");
 	}
@@ -289,6 +307,7 @@ FSlateColor SComfyStudio::GetStatusColor() const
 	case EConnection::Failed:
 		return FComfyEditorStyle::FPalette::Danger;
 	case EConnection::Connecting:
+	case EConnection::SignIn:
 		return FComfyEditorStyle::FPalette::Accent;
 	default:
 		return FComfyEditorStyle::FPalette::TextMuted;

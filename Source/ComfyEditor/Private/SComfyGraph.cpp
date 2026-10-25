@@ -1,8 +1,10 @@
 // Copyright Comfy Org. All Rights Reserved.
 
 #include "SComfyGraph.h"
+#include "ComfyCoreModule.h"
 #include "ComfyEditorLibrary.h"
 #include "ComfyGraphBridge.h"
+#include "ComfyPageChannel.h"
 #include "ComfySubsystem.h"
 #include "ComfyWorkflow.h"
 #include "Framework/Application/SlateApplication.h"
@@ -11,6 +13,11 @@
 #include "IWebBrowserSingleton.h"
 #include "IWebBrowserWindow.h"
 #include "Containers/Ticker.h"
+#include "Dom/JsonObject.h"
+#include "Interfaces/IPluginManager.h"
+#include "Misc/FileHelper.h"
+#include "Serialization/JsonReader.h"
+#include "Serialization/JsonSerializer.h"
 #include "Misc/Paths.h"
 #include "Modules/ModuleManager.h"
 #include "SWebBrowser.h"
@@ -51,6 +58,74 @@ namespace ComfyGraphPrivate
 	}
 }
 
+/**
+ * Runs Comfy Core's calls in the Graph view's page through window.__comfyUnreal.call, and matches the
+ * page's replies to them. Ready once the page bridge reports a signed-in Comfy Cloud account.
+ */
+class FComfyGraphPageChannel : public IComfyPageChannel, public TSharedFromThis<FComfyGraphPageChannel>
+{
+public:
+	/** Runs script in the page; false when there's no page. */
+	TFunction<bool(const FString& Script)> Execute;
+	bool bSignedIn = false;
+
+	virtual bool IsReady() const override
+	{
+		return bSignedIn;
+	}
+
+	virtual void Call(const FString& Method, const FString& ArgsJson, FReply Reply, float TimeoutSeconds) override
+	{
+		const FString Id = FString::Printf(TEXT("c%d"), ++NextId);
+		const FString Script = FString::Printf(
+			TEXT("window.__comfyUnreal ? window.__comfyUnreal.call(\"%s\", \"%s\", %s) : window.ue.comfyunreal.reply(\"%s\", false, \"\", \"The page bridge isn't running yet.\");"),
+			*Id, *Method, ArgsJson.IsEmpty() ? TEXT("{}") : *ArgsJson, *Id);
+		Pending.Add(Id, MoveTemp(Reply));
+		if (!Execute || !Execute(Script))
+		{
+			Finish(Id, false, FString(), TEXT("The Comfy page in Comfy Studio isn't open."));
+			return;
+		}
+		TWeakPtr<FComfyGraphPageChannel> WeakThis = AsShared();
+		FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateLambda([WeakThis, Id, Method, TimeoutSeconds](float)
+		{
+			if (const TSharedPtr<FComfyGraphPageChannel> This = WeakThis.Pin())
+			{
+				This->Finish(Id, false, FString(), FString::Printf(TEXT("The Comfy page didn't answer %s within %.0f seconds."), *Method, TimeoutSeconds));
+			}
+			return false;
+		}), TimeoutSeconds);
+	}
+
+	void Finish(const FString& Id, bool bOk, const FString& ResultJson, const FString& Error)
+	{
+		FReply Reply;
+		if (Pending.RemoveAndCopyValue(Id, Reply) && Reply)
+		{
+			Reply(bOk, ResultJson, Error);
+		}
+	}
+
+	/** The page went away (navigation, reload, Comfy Studio closed): nothing pending will be answered. */
+	void Reset(const FString& Why)
+	{
+		bSignedIn = false;
+		TMap<FString, FReply> Failed = MoveTemp(Pending);
+		Pending.Reset();
+		for (TPair<FString, FReply>& Pair : Failed)
+		{
+			if (Pair.Value)
+			{
+				Pair.Value(false, FString(), Why);
+			}
+		}
+	}
+
+private:
+	TMap<FString, FReply> Pending;
+	int32 NextId = 0;
+};
+
 void SComfyGraph::Construct(const FArguments& InArgs)
 {
 	SelectedWorkflow = InArgs._SelectedWorkflow;
@@ -72,6 +147,45 @@ void SComfyGraph::Construct(const FArguments& InArgs)
 			This->SetMessage(FText::FromString(Text), true);
 		}
 	};
+	Bridge->OnAccount = [WeakThis](const FString& AccountJson)
+	{
+		if (const TSharedPtr<SComfyGraph> This = WeakThis.Pin())
+		{
+			This->HandleAccount(AccountJson);
+		}
+	};
+	Bridge->OnReply = [WeakThis](const FString& CallId, bool bOk, const FString& ResultJson, const FString& Error)
+	{
+		if (const TSharedPtr<SComfyGraph> This = WeakThis.Pin())
+		{
+			This->Channel->Finish(CallId, bOk, ResultJson, Error);
+		}
+	};
+
+	Channel = MakeShared<FComfyGraphPageChannel>();
+	Channel->Execute = [WeakThis](const FString& Script)
+	{
+		const TSharedPtr<SComfyGraph> This = WeakThis.Pin();
+		if (!This.IsValid() || !This->Browser.IsValid() || This->bPageLoading)
+		{
+			return false;
+		}
+		This->Browser->ExecuteJavascript(Script);
+		return true;
+	};
+	if (UComfySubsystem* Comfy = UComfySubsystem::Get())
+	{
+		Comfy->SetPageChannel(Channel);
+		RefreshAccountHandle = Comfy->OnCloudAccountRefreshRequested.AddLambda([WeakThis]()
+		{
+			const TSharedPtr<SComfyGraph> This = WeakThis.Pin();
+			if (This.IsValid() && This->IsCloudPage())
+			{
+				// The page answers by reporting the account again.
+				This->Channel->Call(TEXT("account"), TEXT("{}"), [](bool, const FString&, const FString&) {}, 30.f);
+			}
+		});
+	}
 
 	auto Button = [](const FText& Label, const FText& Tooltip, FOnClicked OnClicked, TAttribute<bool> Enabled)
 	{
@@ -118,6 +232,62 @@ void SComfyGraph::Construct(const FArguments& InArgs)
 			SAssignNew(BrowserHost, SBox)
 		]
 	];
+}
+
+SComfyGraph::~SComfyGraph()
+{
+	Channel->Execute = nullptr;
+	Channel->Reset(TEXT("Comfy Studio was closed."));
+	if (UComfySubsystem* Comfy = UComfySubsystem::Get())
+	{
+		Comfy->OnCloudAccountRefreshRequested.Remove(RefreshAccountHandle);
+		if (Comfy->GetPageChannel() == Channel)
+		{
+			Comfy->SetPageChannel(nullptr);
+			Comfy->SetCloudAccount(FComfyCloudAccount());
+		}
+	}
+}
+
+bool SComfyGraph::IsCloudPage() const
+{
+	return LoadedUrl.Contains(TEXT("cloud.comfy.org"));
+}
+
+const FString& SComfyGraph::GetBridgeScript()
+{
+	if (BridgeScript.IsEmpty())
+	{
+		const TSharedPtr<IPlugin> Plugin = IPluginManager::Get().FindPlugin(TEXT("ComfyUnreal"));
+		const FString Path = Plugin.IsValid() ? Plugin->GetBaseDir() / TEXT("Resources/Bridge/comfy_unreal_page.js") : FString();
+		if (Path.IsEmpty() || !FFileHelper::LoadFileToString(BridgeScript, *Path))
+		{
+			UE_LOG(LogComfy, Warning, TEXT("Couldn't read the page bridge script at %s; Comfy Cloud sign-in won't reach Unreal."), *Path);
+		}
+	}
+	return BridgeScript;
+}
+
+void SComfyGraph::HandleAccount(const FString& AccountJson)
+{
+	UComfySubsystem* Comfy = UComfySubsystem::Get();
+	TSharedPtr<FJsonObject> Json;
+	if (!Comfy || !IsCloudPage() || !FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(AccountJson), Json) || !Json.IsValid())
+	{
+		return;
+	}
+	FComfyCloudAccount Account;
+	Account.bSignedIn = Json->GetBoolField(TEXT("signedIn"));
+	Json->TryGetStringField(TEXT("displayName"), Account.DisplayName);
+	Json->TryGetStringField(TEXT("email"), Account.Email);
+	Json->TryGetStringField(TEXT("workspace"), Account.Workspace);
+	Json->TryGetNumberField(TEXT("freeRunsRemaining"), Account.FreeRunsRemaining);
+	Json->TryGetNumberField(TEXT("freeRunsAllowance"), Account.FreeRunsAllowance);
+	Json->TryGetNumberField(TEXT("credits"), Account.Credits);
+	Account.UpdatedAt = FDateTime::UtcNow();
+	// Ready before the subsystem hears of it, so the Cloud check it starts can use the page.
+	Channel->bSignedIn = Account.bSignedIn;
+	Comfy->SetCloudAccount(Account);
 }
 
 bool SComfyGraph::HasBrowser() const
@@ -169,6 +339,7 @@ void SComfyGraph::Activate()
 		BrowserHost->SetContent(SNew(SBox).Padding(12)[SNew(STextBlock).AutoWrapText(true).Text(WhyNot)]);
 		Browser.Reset();
 		LoadedUrl.Reset();
+		HandleLoadStarted();
 		SetMessage(FText::GetEmpty(), false);
 		return;
 	}
@@ -207,6 +378,7 @@ void SComfyGraph::ShowBrowser(const FString& Url)
 		.ShowAddressBar(false)
 		.OnCreateWindow(this, &SComfyGraph::HandleCreateWindow)
 		.OnCloseWindow(this, &SComfyGraph::HandleCloseWindow)
+		.OnLoadStarted(this, &SComfyGraph::HandleLoadStarted)
 		.OnLoadCompleted(this, &SComfyGraph::HandleLoadCompleted));
 	Browser->BindUObject(TEXT("comfyunreal"), Bridge.Get(), true);
 	LoadedUrl = Url;
@@ -244,9 +416,26 @@ FReply SComfyGraph::OnOpenSelected()
 	return FReply::Handled();
 }
 
+void SComfyGraph::HandleLoadStarted()
+{
+	bPageLoading = true;
+	Channel->Reset(TEXT("The Comfy page reloaded."));
+	// Off Comfy Cloud, the page can't vouch for a Cloud sign-in any more.
+	UComfySubsystem* Comfy = UComfySubsystem::Get();
+	if (Comfy && !IsCloudPage() && Comfy->GetCloudAccount().bSignedIn)
+	{
+		Comfy->SetCloudAccount(FComfyCloudAccount());
+	}
+}
+
 void SComfyGraph::HandleLoadCompleted()
 {
 	bPageLoading = false;
+	// The bridge reports the signed-in account and runs Comfy Cloud jobs for Unreal. It waits for the app to start.
+	if (Browser.IsValid() && !GetBridgeScript().IsEmpty())
+	{
+		Browser->ExecuteJavascript(GetBridgeScript());
+	}
 	if (PendingWorkflow.IsValid())
 	{
 		// The ComfyUI app finishes starting a moment after the page's load event.

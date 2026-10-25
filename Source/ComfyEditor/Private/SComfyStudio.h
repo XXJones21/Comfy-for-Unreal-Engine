@@ -35,6 +35,8 @@ private:
 		Connecting,
 		Connected,
 		Failed,
+		/** Comfy Cloud without a key, waiting for a sign-in. */
+		SignIn,
 	};
 
 	TSharedRef<SWidget> BuildStatusLine();
@@ -47,6 +49,7 @@ private:
 	int32 GetActiveJobCount() const;
 	void ShowView(const FString& View);
 	void OpenInGraph(const class UComfyWorkflow* Workflow);
+	void LoadCloudPageIfActive();
 
 	TArray<TSharedPtr<FName>> BackendOptions;
 	TSharedPtr<SComboBox<TSharedPtr<FName>>> BackendCombo;
