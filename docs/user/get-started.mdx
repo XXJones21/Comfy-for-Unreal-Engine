@@ -45,7 +45,10 @@ The **Graph** view and the Comfy Cloud sign-in use Unreal's embedded web browser
   </Step>
 </Steps>
 
-{/* SCREENSHOT: the Unreal Plugins window filtered to "Comfy for Unreal", with the plugin enabled. */}
+{/* SCREENSHOT: /images/comfy-unreal/plugins-window.png. Shows the Unreal Plugins window filtered to "Comfy for Unreal", with the plugin enabled. Remove the comment markers around the Frame below when the image exists. */}
+{/* <Frame>
+  <img src="/images/comfy-unreal/plugins-window.png" alt="Unreal Plugins window filtered to Comfy for Unreal with the plugin enabled" />
+</Frame> */}
 
 ## Open Comfy Studio
 
@@ -68,7 +71,10 @@ The status line across the top of the tab stays visible in both views:
 | **Check** or **Retry** | Checks that the backend answers and accepts your key. |
 | **Settings** | Opens **Project Settings > Plugins > Comfy**, where the backends are defined. |
 
-{/* SCREENSHOT: the Comfy Studio status line with Run | Graph, the backend picker on Comfy Cloud, a green dot, "Connected" with account and credits, and Check and Settings. */}
+{/* SCREENSHOT: /images/comfy-unreal/status-line.png. Shows the Comfy Studio status line with Run | Graph, the backend picker on Comfy Cloud, a green dot, "Connected" with account and credits, and Check and Settings. Remove the comment markers around the Frame below when the image exists. */}
+{/* <Frame>
+  <img src="/images/comfy-unreal/status-line.png" alt="Comfy Studio status line connected to Comfy Cloud, showing the account, free runs and Comfy Credits" />
+</Frame> */}
 
 This page covers **Desktop** and **Comfy Cloud**. **Comfy Router** runs single models through a Comfy API Key and has no graph editor.
 
@@ -91,7 +97,10 @@ Select a backend in the status line, then follow the tab that matches it. You're
       Runs that use your sign-in go through the Comfy Cloud page inside Comfy Studio. Keep the Comfy Studio tab open until they finish. If you close it, the run fails in Unreal but keeps running on Comfy Cloud, and you can find it in the history in the **Graph** view.
     </Warning>
 
-    {/* SCREENSHOT: the Run view's "Sign in to Comfy Cloud" card with Sign in, Use an API key instead and Use Comfy Desktop instead. */}
+    {/* SCREENSHOT: /images/comfy-unreal/sign-in-card.png. Shows the Run view's "Sign in to Comfy Cloud" card with Sign in, Use an API key instead and Use Comfy Desktop instead. Remove the comment markers around the Frame below when the image exists. */}
+    {/* <Frame>
+      <img src="/images/comfy-unreal/sign-in-card.png" alt="Run view card titled Sign in to Comfy Cloud with Sign in, Use an API key instead and Use Comfy Desktop instead" />
+    </Frame> */}
   </Tab>
   <Tab title="Comfy Cloud with a Comfy API Key">
     A Comfy API Key lets Comfy Studio run on Comfy Cloud without the sign-in page. The same key is used for Comfy Router, Comfy API deployments and Partner Nodes.
@@ -146,7 +155,10 @@ Select a backend in the status line, then follow the tab that matches it. You're
 5. Set **Batch** to the number of runs you want.
 6. Click **Run**.
 
-{/* SCREENSHOT: the Run view with a Workflow chosen: the picker, a prompt card, a seed card with Randomize, the IN UNREAL card, Batch and Run. */}
+{/* SCREENSHOT: /images/comfy-unreal/run-view.png. Shows the Run view with a Workflow chosen: the picker, a prompt card, a seed card with Randomize, the IN UNREAL card, Batch and Run. Remove the comment markers around the Frame below when the image exists. */}
+{/* <Frame>
+  <img src="/images/comfy-unreal/run-view.png" alt="Run view with a Workflow chosen: the picker, input cards, the IN UNREAL card, Batch and Run" />
+</Frame> */}
 
 ### Choose a Workflow
 
@@ -227,7 +239,10 @@ The buttons under the preview work on the selected result:
 | **Show in Content Browser** | Imports the result if needed and selects its assets in the Content Browser. |
 | **Open in Graph** | Opens the result's Workflow in the **Graph** view. |
 
-{/* SCREENSHOT: the gallery with a texture result in the preview, the action buttons, and the result strip with one run in progress. */}
+{/* SCREENSHOT: /images/comfy-unreal/result-gallery.png. Shows the gallery with a texture result in the preview, the action buttons, and the result strip with one run in progress. Remove the comment markers around the Frame below when the image exists. */}
+{/* <Frame>
+  <img src="/images/comfy-unreal/result-gallery.png" alt="Gallery with a texture result in the preview, the action buttons, and the result strip" />
+</Frame> */}
 
 **Replace on selection** works with materials and static meshes. For a texture result, turn on **Make a material from images** first. You can also undo a replace with `Ctrl+Z`.
 
@@ -248,7 +263,10 @@ After your first run, a **Project runs** button appears under **Run**. It shows 
 
 The list shows the 50 most recent runs. Every run and its output files are kept in your project's `Saved/Comfy/Jobs` folder, so the list survives editor restarts.
 
-{/* SCREENSHOT: the Project runs list open, with thumbnails, titles and times. */}
+{/* SCREENSHOT: /images/comfy-unreal/project-runs.png. Shows the Project runs list open, with thumbnails, titles and times. Remove the comment markers around the Frame below when the image exists. */}
+{/* <Frame>
+  <img src="/images/comfy-unreal/project-runs.png" alt="Project runs list open, with thumbnails, titles and times" />
+</Frame> */}
 
 ## Add your own Workflow
 
@@ -338,6 +356,11 @@ The Comfy for Unreal extension for ComfyUI lets a Workflow author choose exactly
     3. Click **Retry** in the status line. If the file still isn't listed, restart ComfyUI and click **Retry** again.
 
     You can also select another file in the model card's list if you know it works with the Workflow.
+
+    {/* SCREENSHOT: /images/comfy-unreal/model-missing.png. Shows a model card with the Not found on this backend message and the Download button. Remove the comment markers around the Frame below when the image exists. */}
+    {/* <Frame>
+      <img src="/images/comfy-unreal/model-missing.png" alt="Model card reading Not found on this backend, with a Download button" />
+    </Frame> */}
   </Accordion>
   <Accordion title="A Comfy Cloud run failed after I closed Comfy Studio">
     Runs that use your sign-in need the Comfy Studio tab open. The run keeps going on Comfy Cloud. Open Comfy Studio and find it in the history in the **Graph** view.
