@@ -42,6 +42,10 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Manifest")
 	TArray<FComfyWorkflowOutput> Outputs;
 
+	/** Named starting values for the inputs, shown as buttons above the form. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Manifest")
+	TArray<FComfyWorkflowPreset> Presets;
+
 	/** Node classes the graph needs. Checked against a backend before submitting. */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Graph")
 	TArray<FString> RequiredNodeClasses;

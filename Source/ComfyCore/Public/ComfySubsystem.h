@@ -102,9 +102,19 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Comfy|Backends")
 	TArray<FString> GetInputOptions(FName Backend, const UComfyWorkflow* Workflow, const FString& InputName) const;
 
-	/** The value a Model input gets when nobody sets it: the first backend file matching its Prefer list, else its default. */
+	/**
+	 * The value a Model input gets when nobody sets it: the first backend file matching its Prefer list.
+	 * Empty when the input has a Prefer list and the backend has none of those files. Without a Prefer list, its default.
+	 */
 	UFUNCTION(BlueprintPure, Category = "Comfy|Backends")
 	FString GetDefaultInputValue(FName Backend, const UComfyWorkflow* Workflow, const FString& InputName) const;
+
+	/** Model inputs whose file the backend doesn't have, for the values a run would use. Empty when all are there, or when the backend can't say. */
+	UFUNCTION(BlueprintPure, Category = "Comfy|Backends")
+	TArray<FComfyWorkflowInput> GetMissingModels(FName Backend, const UComfyWorkflow* Workflow, const TMap<FString, FString>& Inputs) const;
+
+	/** One line per missing model: the file, its size and folder, and where to download it. */
+	static FString DescribeMissingModels(FName Backend, const TArray<FComfyWorkflowInput>& Missing);
 
 	/** Node classes the workflow needs that the backend doesn't have. Empty when all are there, or when the backend can't say. */
 	UFUNCTION(BlueprintPure, Category = "Comfy|Backends")

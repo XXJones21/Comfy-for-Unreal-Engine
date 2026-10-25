@@ -16,6 +16,7 @@
 #include "Engine/Selection.h"
 #include "Engine/StaticMesh.h"
 #include "Engine/Texture2D.h"
+#include "Components/AudioComponent.h"
 #include "Components/MeshComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Framework/Application/SlateApplication.h"
@@ -27,6 +28,8 @@
 #include "Misc/Paths.h"
 #include "SDropTarget.h"
 #include "ScopedTransaction.h"
+#include "Sound/SoundBase.h"
+#include "Subsystems/AssetEditorSubsystem.h"
 #include "Widgets/Images/SImage.h"
 #include "Widgets/Input/SButton.h"
 #include "Widgets/Input/SCheckBox.h"
@@ -1008,6 +1011,37 @@ void SComfyRunView::RebuildForm()
 			SNew(STextBlock).TextStyle(&Style(), "Comfy.Text.Muted").AutoWrapText(true).Text(Workflow->Description)
 		];
 	}
+	if (Workflow->Presets.Num() > 0)
+	{
+		TSharedRef<SWrapBox> Presets = SNew(SWrapBox).UseAllottedSize(true).InnerSlotPadding(FVector2D(6.f, 6.f));
+		for (const FComfyWorkflowPreset& Preset : Workflow->Presets)
+		{
+			Presets->AddSlot()
+			[
+				SNew(SButton)
+				.ButtonStyle(&Style(), "Comfy.Button")
+				.ToolTipText(FText::FromString(FString::JoinBy(Preset.Values, TEXT("\n"), [](const TPair<FString, FString>& Pair) { return Pair.Key + TEXT(": ") + Pair.Value; })))
+				.OnClicked_Lambda([this, Values = Preset.Values]()
+				{
+					InputValues.Append(Values);
+					RebuildForm();
+					return FReply::Handled();
+				})
+				[
+					SNew(STextBlock).TextStyle(&Style(), "Comfy.Text.Muted").Text(FText::FromString(Preset.Name))
+				]
+			];
+		}
+		FormBox->AddSlot().AutoHeight().Padding(0, 0, 0, 10)
+		[
+			SNew(SVerticalBox)
+			+ SVerticalBox::Slot().AutoHeight().Padding(0, 0, 0, 6)
+			[
+				SNew(STextBlock).TextStyle(&Style(), "Comfy.Text.Label").Text(LOCTEXT("Presets", "START FROM"))
+			]
+			+ SVerticalBox::Slot().AutoHeight()[Presets]
+		];
+	}
 	if (Workflow->Inputs.Num() == 0)
 	{
 		FormBox->AddSlot().AutoHeight()
@@ -1136,13 +1170,55 @@ TSharedRef<SWidget> SComfyRunView::MakeInputWidget(const FComfyWorkflowInput& In
 				Options->Add(MakeShared<FString>(Choice));
 			}
 			OptionLists.Add(Options);
-			return SNew(SComboBox<TSharedPtr<FString>>)
+			TSharedRef<SWidget> Combo = SNew(SComboBox<TSharedPtr<FString>>)
 				.OptionsSource(Options.Get())
 				.OnGenerateWidget_Lambda([](TSharedPtr<FString> Item) { return SNew(STextBlock).Text(FText::FromString(*Item)); })
 				.OnSelectionChanged_Lambda([this, Name](TSharedPtr<FString> Item, ESelectInfo::Type) { if (Item.IsValid()) { InputValues.Add(Name, *Item); } })
 				[
 					SNew(STextBlock).Text_Lambda(Getter)
 				];
+			if (Input.Type != EComfyInputType::Model)
+			{
+				return Combo;
+			}
+			// The backend lacks the file this workflow was made for: say which one and where to get it.
+			const FComfyModelDownload Download = Input.Download;
+			const FString Wanted = !Download.File.IsEmpty() ? Download.File : Input.Prefer.Num() > 0 ? Input.Prefer[0] : FString();
+			auto IsMissing = [this, Name, Choices]() { const FString* Value = InputValues.Find(Name); return !Value || Value->IsEmpty() || !Choices.Contains(*Value); };
+			return SNew(SVerticalBox)
+				+ SVerticalBox::Slot().AutoHeight()[Combo]
+				+ SVerticalBox::Slot().AutoHeight().Padding(0, 6, 0, 0)
+				[
+					SNew(STextBlock)
+					.TextStyle(&Style(), "Comfy.Text.Error")
+					.AutoWrapText(true)
+					.Visibility_Lambda([IsMissing]() { return IsMissing() ? EVisibility::Visible : EVisibility::Collapsed; })
+					.Text(Download.Folder.IsEmpty()
+						? FText::Format(LOCTEXT("ModelMissing", "Not found on this backend: {0}. Pick another file above."), FText::FromString(Wanted))
+						: FText::Format(LOCTEXT("ModelMissingFolder", "Not found on this backend: {0} ({1}). It goes in ComfyUI/models/{2}."),
+							FText::FromString(Wanted), FText::FromString(Download.Size), FText::FromString(Download.Folder)))
+				]
+				+ SVerticalBox::Slot().AutoHeight().Padding(0, 6, 0, 0).HAlign(HAlign_Left)
+				[
+					SNew(SBox)
+					.Visibility_Lambda([IsMissing, Url = Download.Url]() { return IsMissing() && !Url.IsEmpty() ? EVisibility::Visible : EVisibility::Collapsed; })
+					[
+						Button(LOCTEXT("DownloadModel", "Download"), FOnClicked::CreateLambda([Url = Download.Url]()
+						{
+							FPlatformProcess::LaunchURL(*Url, nullptr, nullptr);
+							return FReply::Handled();
+						}))
+					]
+				];
+		}
+		if (Input.Type == EComfyInputType::Model)
+		{
+			// No list yet (backend not checked) or an empty folder.
+			return SNew(STextBlock).TextStyle(&Style(), "Comfy.Text.Muted").AutoWrapText(true).Text_Lambda([Getter]()
+			{
+				const FText Value = Getter();
+				return Value.IsEmpty() ? LOCTEXT("ModelUnknown", "Connect a backend to list its model files.") : Value;
+			});
 		}
 		break;
 	}
@@ -1364,6 +1440,46 @@ FReply SComfyRunView::OnRun()
 		return FReply::Handled();
 	}
 	SetStatus(FText::GetEmpty(), false);
+
+	// Catch what would only fail on the backend: missing models and empty file inputs.
+	const TArray<FComfyWorkflowInput> MissingModels = Comfy->GetMissingModels(NAME_None, Workflow, InputValues);
+	if (MissingModels.Num() > 0)
+	{
+		SetStatus(FText::FromString(UComfySubsystem::DescribeMissingModels(Comfy->GetActiveBackend(), MissingModels)), true);
+		return FReply::Handled();
+	}
+	for (const FComfyWorkflowInput& Input : Workflow->Inputs)
+	{
+		const FString* Value = InputValues.Find(Input.Name);
+		if (Input.Type != EComfyInputType::File || (Value && !Value->IsEmpty()))
+		{
+			continue;
+		}
+		// An empty texture or mesh input takes the Content Browser selection, as its source says.
+		const bool bTextures = Input.Source.Equals(TEXT("SelectedTextures"), ESearchCase::IgnoreCase);
+		const bool bMeshes = Input.Source.Equals(TEXT("SelectedMeshes"), ESearchCase::IgnoreCase);
+		if (bTextures || bMeshes)
+		{
+			TArray<FAssetData> Selected;
+			FModuleManager::LoadModuleChecked<FContentBrowserModule>("ContentBrowser").Get().GetSelectedAssets(Selected);
+			const UClass* Wanted = bTextures ? UTexture2D::StaticClass() : UStaticMesh::StaticClass();
+			const FAssetData* Match = Selected.FindByPredicate([Wanted](const FAssetData& Asset) { return Asset.IsInstanceOf(Wanted); });
+			if (Match)
+			{
+				SetFileFromAsset(Input.Name, Match->GetAsset());
+				Value = InputValues.Find(Input.Name);
+			}
+		}
+		if (!Value || Value->IsEmpty())
+		{
+			const FString Label = Input.Label.IsEmpty() ? Input.Name : Input.Label;
+			SetStatus(bTextures
+				? FText::Format(LOCTEXT("NeedTexture", "{0}: select a texture in the Content Browser, or drop an image file on it."), FText::FromString(Label))
+				: FText::Format(LOCTEXT("NeedFile", "{0}: drop a file on it, or choose one with Browse."), FText::FromString(Label)), true);
+			return FReply::Handled();
+		}
+	}
+
 	for (int32 Index = 0; Index < BatchCount; ++Index)
 	{
 		TMap<FString, FString> Values = InputValues;
@@ -1415,12 +1531,27 @@ TSharedRef<SWidget> SComfyRunView::BuildGallery()
 				]
 				+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Center)
 				[
-					SNew(STextBlock)
-					.TextStyle(&Style(), "Comfy.Text.Muted")
-					.Justification(ETextJustify::Center)
-					.AutoWrapText(true)
-					.Text(this, &SComfyRunView::GetPreviewText)
-					.Visibility_Lambda([this]() { return GetJobBrush(SelectedJob.Get()) ? EVisibility::Collapsed : EVisibility::HitTestInvisible; })
+					SNew(SVerticalBox)
+					.Visibility_Lambda([this]() { return GetJobBrush(SelectedJob.Get()) ? EVisibility::Collapsed : EVisibility::SelfHitTestInvisible; })
+					+ SVerticalBox::Slot().AutoHeight()
+					[
+						SNew(STextBlock)
+						.TextStyle(&Style(), "Comfy.Text.Muted")
+						.Justification(ETextJustify::Center)
+						.AutoWrapText(true)
+						.Text(this, &SComfyRunView::GetPreviewText)
+					]
+					// Sounds and meshes have no picture: play or open them instead.
+					+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center).Padding(0, 12, 0, 0)
+					[
+						SNew(SButton)
+						.ButtonStyle(&Style(), "Comfy.Button.Primary")
+						.Visibility_Lambda([this]() { return GetPreviewAction().IsEmpty() ? EVisibility::Collapsed : EVisibility::Visible; })
+						.OnClicked(this, &SComfyRunView::OnPreviewAction)
+						[
+							SNew(STextBlock).TextStyle(&Style(), "Comfy.Text").Text_Lambda([this]() { return GetPreviewAction(); })
+						]
+					]
 				]
 			]
 		]
@@ -1576,6 +1707,87 @@ FText SComfyRunView::GetPreviewText() const
 		return FText::Format(LOCTEXT("NonImage", "{0}\n{1}"), FText::FromString(StaticEnum<EComfyOutputKind>()->GetNameStringByValue(int64(Job->Outputs[0].Kind))), FText::FromString(Job->Outputs[0].FileName));
 	}
 	return FText::FromString(Job->GetStateText());
+}
+
+UObject* SComfyRunView::FindImported(const UComfyJob* Job, const UClass* Class) const
+{
+	const TArray<TWeakObjectPtr<UObject>>* Assets = Job ? ImportedAssets.Find(Job->JobId) : nullptr;
+	if (Assets)
+	{
+		for (const TWeakObjectPtr<UObject>& Asset : *Assets)
+		{
+			if (Asset.IsValid() && Asset->IsA(Class))
+			{
+				return Asset.Get();
+			}
+		}
+	}
+	return nullptr;
+}
+
+FText SComfyRunView::GetPreviewAction() const
+{
+	const UComfyJob* Job = SelectedJob.Get();
+	if (!Job || !Job->Succeeded() || Job->Outputs.Num() == 0)
+	{
+		return FText::GetEmpty();
+	}
+	switch (Job->Outputs[0].Kind)
+	{
+	case EComfyOutputKind::Audio:
+	{
+		const UAudioComponent* Preview = GEditor ? GEditor->GetPreviewAudioComponent() : nullptr;
+		return PlayingJob == Job && Preview && Preview->IsPlaying() ? LOCTEXT("StopSound", "Stop") : LOCTEXT("PlaySound", "Play");
+	}
+	case EComfyOutputKind::Mesh:
+		return LOCTEXT("OpenMesh", "Open mesh");
+	default:
+		return FText::GetEmpty();
+	}
+}
+
+FReply SComfyRunView::OnPreviewAction()
+{
+	UComfyJob* Job = SelectedJob.Get();
+	if (!Job || Job->Outputs.Num() == 0 || !GEditor)
+	{
+		return FReply::Handled();
+	}
+	const FComfyOutputFile& Output = Job->Outputs[0];
+	if (Output.Kind == EComfyOutputKind::Audio)
+	{
+		UAudioComponent* Preview = GEditor->GetPreviewAudioComponent();
+		if (PlayingJob == Job && Preview && Preview->IsPlaying())
+		{
+			Preview->Stop();
+			PlayingJob.Reset();
+			return FReply::Handled();
+		}
+		if (USoundBase* Sound = Cast<USoundBase>(FindImported(Job, USoundBase::StaticClass())))
+		{
+			GEditor->PlayPreviewSound(Sound);
+			PlayingJob = Job;
+			return FReply::Handled();
+		}
+	}
+	else if (Output.Kind == EComfyOutputKind::Mesh)
+	{
+		if (UObject* Mesh = FindImported(Job, UStaticMesh::StaticClass()))
+		{
+			GEditor->GetEditorSubsystem<UAssetEditorSubsystem>()->OpenEditorForAsset(Mesh);
+			return FReply::Handled();
+		}
+	}
+	// Not imported yet: open the file in the system's player or 3D viewer.
+	if (FPaths::FileExists(Output.LocalPath))
+	{
+		FPlatformProcess::LaunchFileInDefaultExternalApplication(*Output.LocalPath);
+	}
+	else
+	{
+		SetStatus(LOCTEXT("NoLocalFile", "The result file isn't on disk any more. Run the workflow again."), true);
+	}
+	return FReply::Handled();
 }
 
 // Result actions -----------------------------------------------------------------------------

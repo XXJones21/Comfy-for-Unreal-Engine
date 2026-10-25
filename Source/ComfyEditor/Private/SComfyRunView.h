@@ -76,6 +76,11 @@ private:
 	void SelectJob(UComfyJob* Job);
 	const FSlateBrush* GetJobBrush(const UComfyJob* Job);
 	FText GetPreviewText() const;
+	/** "Play", "Stop" or "Open" for a finished sound or mesh result; empty otherwise. */
+	FText GetPreviewAction() const;
+	FReply OnPreviewAction();
+	/** The first asset of this class that the job put in the project. */
+	UObject* FindImported(const UComfyJob* Job, const UClass* Class) const;
 
 	// Result actions
 	FReply OnImport();
@@ -155,4 +160,7 @@ private:
 	TMap<FString, FPreview> Previews;
 
 	FDelegateHandle JobAddedHandle;
+
+	/** The job whose sound is playing in the editor, if any. */
+	TWeakObjectPtr<UComfyJob> PlayingJob;
 };

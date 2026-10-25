@@ -8,3 +8,4 @@ DerivedDataCache/
 *.sln
 *.suo
 *.VC.db
+__pycache__/

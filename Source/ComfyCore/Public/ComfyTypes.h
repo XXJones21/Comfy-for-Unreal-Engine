@@ -134,6 +134,28 @@ enum class EComfyInputType : uint8
 	Model,
 };
 
+/** Where to get a Model input's file when the backend doesn't have it. */
+USTRUCT(BlueprintType)
+struct COMFYCORE_API FComfyModelDownload
+{
+	GENERATED_BODY()
+
+	/** File name, for example "flux2-vae.safetensors". */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Comfy")
+	FString File;
+
+	/** Folder under ComfyUI/models, for example "vae". */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Comfy")
+	FString Folder;
+
+	/** Download size as text, for example "321 MB". */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Comfy")
+	FString Size;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Comfy")
+	FString Url;
+};
+
 /** One workflow input that people, Blueprints and agents may set. */
 USTRUCT(BlueprintType)
 struct COMFYCORE_API FComfyWorkflowInput
@@ -178,9 +200,27 @@ struct COMFYCORE_API FComfyWorkflowInput
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Comfy")
 	FString Family;
 
+	/** Model inputs: the file to get when the backend has none of Prefer. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Comfy")
+	FComfyModelDownload Download;
+
 	/** Where Unreal fills it from: Constant (the form), Prompt, SelectedTextures, SelectedMeshes or ViewportCapture. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Comfy")
 	FString Source;
+};
+
+/** A named set of input values from the manifest, such as "Brick" for a texture prompt. */
+USTRUCT(BlueprintType)
+struct COMFYCORE_API FComfyWorkflowPreset
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Comfy")
+	FString Name;
+
+	/** Input name to value, as text. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Comfy")
+	TMap<FString, FString> Values;
 };
 
 /** One workflow output and how it lands in Unreal. */
@@ -388,6 +428,8 @@ namespace ComfyTypes
 	COMFYCORE_API bool IsTerminal(EComfyJobState State);
 	/** A workflow type from docs/MANIFEST.md, with older plural names (Textures, Audio, Meshes) mapped onto it. */
 	COMFYCORE_API FString NormalizeCategory(const FString& Category);
+	/** The first option matching Prefer (exact name, then substring, per entry), or empty when none does. */
+	COMFYCORE_API FString MatchModel(const TArray<FString>& Options, const TArray<FString>& Prefer);
 	/** The first option matching Prefer (exact name, then substring, per entry); else Fallback if it's an option or there are none; else the first option. */
 	COMFYCORE_API FString PickModel(const TArray<FString>& Options, const TArray<FString>& Prefer, const FString& Fallback);
 	/** Fill InputOptions from an object_info response: every input whose spec is a list of strings. */

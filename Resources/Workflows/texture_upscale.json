@@ -1,0 +1,132 @@
+{
+ "comfy_unreal": {
+  "version": 1,
+  "display_name": "Texture Upscale",
+  "category": "Upscale",
+  "group": "Starter",
+  "description": "Makes a texture larger and sharper with Real-ESRGAN x4. Select a texture in the Content Browser, or drop an image file. The default doubles the size.",
+  "inputs": [
+   {
+    "name": "image",
+    "label": "Texture",
+    "node_id": "30",
+    "input": "image",
+    "type": "File",
+    "source": "SelectedTextures",
+    "tooltip": "The texture to upscale"
+   },
+   {
+    "name": "scale",
+    "label": "Scale of the 4x result",
+    "node_id": "42",
+    "input": "scale_by",
+    "type": "Float",
+    "tooltip": "The model always makes the image 4 times larger. 0.5 gives 2x, 1 keeps 4x."
+   },
+   {
+    "name": "model_name",
+    "label": "Upscale model",
+    "node_id": "40",
+    "input": "model_name",
+    "type": "Model",
+    "prefer": [
+     "RealESRGAN_x4plus.safetensors",
+     "RealESRGAN_x4plus.pth"
+    ],
+    "family": "esrgan-4x",
+    "tooltip": "A 4x upscale model in models/upscale_models.",
+    "download": {
+     "file": "RealESRGAN_x4plus.safetensors",
+     "folder": "upscale_models",
+     "size": "67 MB",
+     "url": "https://huggingface.co/Comfy-Org/Real-ESRGAN_repackaged/resolve/main/RealESRGAN_x4plus.safetensors"
+    }
+   }
+  ],
+  "outputs": [
+   {
+    "name": "upscaled",
+    "node_id": "43",
+    "kind": "Texture",
+    "slot": "BaseColor"
+   }
+  ],
+  "presets": [
+   {
+    "name": "2x",
+    "values": {
+     "scale": "0.5"
+    }
+   },
+   {
+    "name": "4x",
+    "values": {
+     "scale": "1.0"
+    }
+   }
+  ]
+ },
+ "prompt": {
+  "30": {
+   "class_type": "LoadImage",
+   "_meta": {
+    "title": "Texture to upscale"
+   },
+   "inputs": {
+    "image": "example.png"
+   }
+  },
+  "40": {
+   "class_type": "UpscaleModelLoader",
+   "_meta": {
+    "title": "Load Upscale Model"
+   },
+   "inputs": {
+    "model_name": "RealESRGAN_x4plus.safetensors"
+   }
+  },
+  "41": {
+   "class_type": "ImageUpscaleWithModel",
+   "_meta": {
+    "title": "Upscale 4x"
+   },
+   "inputs": {
+    "upscale_model": [
+     "40",
+     0
+    ],
+    "image": [
+     "30",
+     0
+    ]
+   }
+  },
+  "42": {
+   "class_type": "ImageScaleBy",
+   "_meta": {
+    "title": "Final size"
+   },
+   "inputs": {
+    "image": [
+     "41",
+     0
+    ],
+    "upscale_method": "lanczos",
+    "scale_by": 0.5
+   }
+  },
+  "43": {
+   "class_type": "SaveImage",
+   "_meta": {
+    "title": "Save Image"
+   },
+   "inputs": {
+    "images": [
+     "42",
+     0
+    ],
+    "filename_prefix": "unreal/upscale"
+   }
+  }
+ }
+}

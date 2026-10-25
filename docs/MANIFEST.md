@@ -37,9 +37,10 @@ The contract between the **Comfy for Unreal** ComfyUI extension and the Unreal p
 - **`category`**: the workflow type, one of `Material`, `Texture`, `Sound`, `Music`, `Mesh`, `Upscale`, `Other`. Older plugin files use `Textures`, `Audio`, `Meshes`; readers treat those as `Texture`, `Sound`, `Mesh`.
 - **`group`**: free text for grouping in a library. Optional.
 - **`inputs[]`**: `node_id` and `input` address a widget in the API graph. `name` is the stable key Blueprints, Python and agents use. `type` is one of `String`, `Text`, `Int`, `Float`, `Bool`, `Seed`, `File`, `Enum`, `Model`. Optional: `label`, `tooltip`, `default` (as text), `options` (for `Enum`), `prefer` and `family` (for `Model`), `source`.
+- **`inputs[].download`** (Model inputs, optional): `{"file", "folder", "size", "url"}`, the file to get when the backend has none of `prefer`. `folder` is the folder under `ComfyUI/models`. When a Model input has a `prefer` list and the backend has none of those files, the plugin doesn't fall back to another file: the form says which file is missing and offers this download, and a run stops with the same message.
 - **`inputs[].source`**: where Unreal fills it from. `Constant` (the form value, the default), `Prompt` (the main text box), `SelectedTextures` (Content Browser selection), `SelectedMeshes`, `ViewportCapture`.
 - **`outputs[]`**: `node_id` is a save or preview node. `kind` is one of `Texture`, `Image`, `Sound`, `Music`, `Mesh`, `Video`, `File`. `slot` applies to `Texture`: `BaseColor`, `Normal`, `Roughness`, `Metallic`, `AO`, `Height`, `ORM`, `Emissive`, `Opacity`.
-- **`presets[]`**: named sets of input values. Optional.
+- **`presets[]`**: named sets of input values, as text. Optional. Comfy Studio shows them as buttons above the form.
 
 ## How Unreal imports outputs
 

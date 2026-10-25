@@ -534,7 +534,61 @@ FString UComfySubsystem::GetDefaultInputValue(FName Backend, const UComfyWorkflo
 	{
 		return Input.DefaultValue;
 	}
-	return ComfyTypes::PickModel(GetInputOptions(Backend, Workflow, InputName), Input.Prefer, Input.DefaultValue);
+	const TArray<FString> Options = GetInputOptions(Backend, Workflow, InputName);
+	if (Input.Prefer.Num() > 0 && Options.Num() > 0)
+	{
+		// A workflow that names its models shouldn't quietly run with some other file.
+		return ComfyTypes::MatchModel(Options, Input.Prefer);
+	}
+	return ComfyTypes::PickModel(Options, Input.Prefer, Input.DefaultValue);
+}
+
+TArray<FComfyWorkflowInput> UComfySubsystem::GetMissingModels(FName Backend, const UComfyWorkflow* Workflow, const TMap<FString, FString>& Inputs) const
+{
+	TArray<FComfyWorkflowInput> Missing;
+	if (!Workflow)
+	{
+		return Missing;
+	}
+	for (const FComfyWorkflowInput& Input : Workflow->Inputs)
+	{
+		if (Input.Type != EComfyInputType::Model)
+		{
+			continue;
+		}
+		const TArray<FString> Options = GetInputOptions(Backend, Workflow, Input.Name);
+		if (Options.Num() == 0)
+		{
+			continue;
+		}
+		const FString* Given = Inputs.Find(Input.Name);
+		const FString Value = Given && !Given->IsEmpty() ? *Given : GetDefaultInputValue(Backend, Workflow, Input.Name);
+		if (Value.IsEmpty() || !Options.Contains(Value))
+		{
+			Missing.Add(Input);
+		}
+	}
+	return Missing;
+}
+
+FString UComfySubsystem::DescribeMissingModels(FName Backend, const TArray<FComfyWorkflowInput>& Missing)
+{
+	TArray<FString> Lines;
+	for (const FComfyWorkflowInput& Input : Missing)
+	{
+		const FString File = !Input.Download.File.IsEmpty() ? Input.Download.File : Input.Prefer.Num() > 0 ? Input.Prefer[0] : Input.DefaultValue;
+		FString Line = FString::Printf(TEXT("%s (%s)"), *File, *Input.Label);
+		if (!Input.Download.Folder.IsEmpty())
+		{
+			Line += FString::Printf(TEXT(", %sin ComfyUI/models/%s"), Input.Download.Size.IsEmpty() ? TEXT("") : *(Input.Download.Size + TEXT(", ")), *Input.Download.Folder);
+		}
+		if (!Input.Download.Url.IsEmpty())
+		{
+			Line += FString::Printf(TEXT(": %s"), *Input.Download.Url);
+		}
+		Lines.Add(Line);
+	}
+	return FString::Printf(TEXT("%s doesn't have the models this workflow needs:\n%s"), *Backend.ToString(), *FString::Join(Lines, TEXT("\n")));
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -646,6 +700,12 @@ UComfyJob* UComfySubsystem::RunWorkflow(UComfyWorkflow* Workflow, const TMap<FSt
 	if (Missing.Num() > 0)
 	{
 		Job->Fail(FString::Printf(TEXT("%s doesn't have these nodes: %s. Install them (ComfyUI Manager) or run on another backend."), *BackendName.ToString(), *FString::Join(Missing, TEXT(", "))));
+		return Job;
+	}
+	const TArray<FComfyWorkflowInput> MissingModels = GetMissingModels(BackendName, Workflow, Job->Inputs);
+	if (MissingModels.Num() > 0)
+	{
+		Job->Fail(DescribeMissingModels(BackendName, MissingModels));
 		return Job;
 	}
 	for (const FComfyWorkflowInput& Input : Workflow->Inputs)

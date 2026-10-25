@@ -1,0 +1,208 @@
+{
+ "comfy_unreal": {
+  "version": 1,
+  "display_name": "Image to Mesh",
+  "category": "Mesh",
+  "group": "Starter",
+  "description": "An untextured 3D mesh from one reference image, with Hunyuan3D 2.0. Imported as a Static Mesh. Use one centered object on a plain background.",
+  "inputs": [
+   {
+    "name": "image",
+    "label": "Reference image",
+    "node_id": "56",
+    "input": "image",
+    "type": "File",
+    "source": "SelectedTextures",
+    "tooltip": "A texture or image file showing one object on a plain background"
+   },
+   {
+    "name": "octree_resolution",
+    "label": "Detail",
+    "node_id": "61",
+    "input": "octree_resolution",
+    "type": "Int",
+    "tooltip": "256 is fast. 384 or 512 is finer and slower."
+   },
+   {
+    "name": "seed",
+    "label": "Seed",
+    "node_id": "3",
+    "input": "seed",
+    "type": "Seed"
+   },
+   {
+    "name": "ckpt_name",
+    "label": "Checkpoint",
+    "node_id": "54",
+    "input": "ckpt_name",
+    "type": "Model",
+    "prefer": [
+     "hunyuan3d-dit-v2_fp16.safetensors",
+     "hunyuan3d-dit-v2.safetensors"
+    ],
+    "family": "hunyuan3d-2",
+    "tooltip": "Hunyuan3D 2.0 in models/checkpoints.",
+    "download": {
+     "file": "hunyuan3d-dit-v2_fp16.safetensors",
+     "folder": "checkpoints",
+     "size": "4.9 GB",
+     "url": "https://huggingface.co/Comfy-Org/hunyuan3D_2.0_repackaged/resolve/main/split_files/hunyuan3d-dit-v2_fp16.safetensors"
+    }
+   }
+  ],
+  "outputs": [
+   {
+    "name": "mesh",
+    "node_id": "67",
+    "kind": "Mesh"
+   }
+  ]
+ },
+ "prompt": {
+  "54": {
+   "class_type": "ImageOnlyCheckpointLoader",
+   "_meta": {
+    "title": "Load Checkpoint"
+   },
+   "inputs": {
+    "ckpt_name": "hunyuan3d-dit-v2_fp16.safetensors"
+   }
+  },
+  "56": {
+   "class_type": "LoadImage",
+   "_meta": {
+    "title": "Reference image"
+   },
+   "inputs": {
+    "image": "example.png"
+   }
+  },
+  "51": {
+   "class_type": "CLIPVisionEncode",
+   "_meta": {
+    "title": "Encode image"
+   },
+   "inputs": {
+    "clip_vision": [
+     "54",
+     1
+    ],
+    "image": [
+     "56",
+     0
+    ],
+    "crop": "center"
+   }
+  },
+  "50": {
+   "class_type": "Hunyuan3Dv2Conditioning",
+   "_meta": {
+    "title": "Conditioning"
+   },
+   "inputs": {
+    "clip_vision_output": [
+     "51",
+     0
+    ]
+   }
+  },
+  "52": {
+   "class_type": "EmptyLatentHunyuan3Dv2",
+   "_meta": {
+    "title": "Latent"
+   },
+   "inputs": {
+    "resolution": 3072,
+    "batch_size": 1
+   }
+  },
+  "70": {
+   "class_type": "ModelSamplingAuraFlow",
+   "_meta": {
+    "title": "Model sampling"
+   },
+   "inputs": {
+    "model": [
+     "54",
+     0
+    ],
+    "shift": 1.0
+   }
+  },
+  "3": {
+   "class_type": "KSampler",
+   "_meta": {
+    "title": "KSampler"
+   },
+   "inputs": {
+    "model": [
+     "70",
+     0
+    ],
+    "seed": 0,
+    "steps": 20,
+    "cfg": 8.0,
+    "sampler_name": "euler",
+    "scheduler": "normal",
+    "positive": [
+     "50",
+     0
+    ],
+    "negative": [
+     "50",
+     1
+    ],
+    "latent_image": [
+     "52",
+     0
+    ],
+    "denoise": 1.0
+   }
+  },
+  "61": {
+   "class_type": "VAEDecodeHunyuan3D",
+   "_meta": {
+    "title": "Decode"
+   },
+   "inputs": {
+    "samples": [
+     "3",
+     0
+    ],
+    "vae": [
+     "54",
+     2
+    ],
+    "num_chunks": 8000,
+    "octree_resolution": 256
+   }
+  },
+  "59": {
+   "class_type": "VoxelToMesh",
+   "_meta": {
+    "title": "Voxel to Mesh"
+   },
+   "inputs": {
+    "voxel": [
+     "61",
+     0
+    ],
+    "algorithm": "surface net",
+    "threshold": 0.6
+   }
+  },
+  "67": {
+   "class_type": "SaveGLB",
+   "_meta": {
+    "title": "Save 3D Model"
+   },
+   "inputs": {
+    "mesh": [
+     "59",
+     0
+    ],
+    "filename_prefix": "unreal/mesh"
+   }
+  }
+ }
+}

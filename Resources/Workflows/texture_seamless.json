@@ -1,0 +1,351 @@
+{
+ "comfy_unreal": {
+  "version": 1,
+  "display_name": "Seamless Texture",
+  "category": "Texture",
+  "group": "Starter",
+  "description": "A flat, evenly lit surface texture from a text prompt, with FLUX.2 Klein 4B. Use Create material to make it tile and get a PBR material.",
+  "inputs": [
+   {
+    "name": "prompt",
+    "label": "Surface",
+    "node_id": "4",
+    "input": "string_b",
+    "type": "Text",
+    "source": "Prompt",
+    "tooltip": "What the surface looks like, for example: mossy cobblestone path"
+   },
+   {
+    "name": "seed",
+    "label": "Seed",
+    "node_id": "10",
+    "input": "noise_seed",
+    "type": "Seed"
+   },
+   {
+    "name": "width",
+    "label": "Width",
+    "node_id": "20",
+    "input": "value",
+    "type": "Int",
+    "tooltip": "512 to 2048. 1024 is the model's native size."
+   },
+   {
+    "name": "height",
+    "label": "Height",
+    "node_id": "21",
+    "input": "value",
+    "type": "Int",
+    "tooltip": "512 to 2048. 1024 is the model's native size."
+   },
+   {
+    "name": "unet_name",
+    "label": "Diffusion model",
+    "node_id": "1",
+    "input": "unet_name",
+    "type": "Model",
+    "prefer": [
+     "flux-2-klein-4b-fp8.safetensors",
+     "flux-2-klein-4b.safetensors"
+    ],
+    "family": "flux2-klein-4b",
+    "tooltip": "FLUX.2 Klein 4B distilled. The fp8 file is smaller and works the same.",
+    "download": {
+     "file": "flux-2-klein-4b-fp8.safetensors",
+     "folder": "diffusion_models",
+     "size": "3.8 GB",
+     "url": "https://huggingface.co/black-forest-labs/FLUX.2-klein-4b-fp8/resolve/main/flux-2-klein-4b-fp8.safetensors"
+    }
+   },
+   {
+    "name": "clip_name",
+    "label": "Text encoder",
+    "node_id": "2",
+    "input": "clip_name",
+    "type": "Model",
+    "prefer": [
+     "qwen_3_4b.safetensors"
+    ],
+    "family": "qwen-3-4b",
+    "tooltip": "Qwen 3 4B, the text encoder FLUX.2 Klein 4B uses.",
+    "download": {
+     "file": "qwen_3_4b.safetensors",
+     "folder": "text_encoders",
+     "size": "7.5 GB",
+     "url": "https://huggingface.co/Comfy-Org/flux2-klein/resolve/main/split_files/text_encoders/qwen_3_4b.safetensors"
+    }
+   },
+   {
+    "name": "vae_name",
+    "label": "VAE",
+    "node_id": "3",
+    "input": "vae_name",
+    "type": "Model",
+    "prefer": [
+     "flux2-vae.safetensors"
+    ],
+    "family": "flux2-vae",
+    "tooltip": "The FLUX.2 VAE.",
+    "download": {
+     "file": "flux2-vae.safetensors",
+     "folder": "vae",
+     "size": "321 MB",
+     "url": "https://huggingface.co/Comfy-Org/flux2-dev/resolve/main/split_files/vae/flux2-vae.safetensors"
+    }
+   }
+  ],
+  "outputs": [
+   {
+    "name": "albedo",
+    "node_id": "14",
+    "kind": "Texture",
+    "slot": "BaseColor"
+   }
+  ],
+  "presets": [
+   {
+    "name": "Cobblestone",
+    "values": {
+     "prompt": "mossy cobblestone path"
+    }
+   },
+   {
+    "name": "Brick",
+    "values": {
+     "prompt": "weathered red brick wall"
+    }
+   },
+   {
+    "name": "Forest floor",
+    "values": {
+     "prompt": "forest floor with pine needles, twigs and small stones"
+    }
+   },
+   {
+    "name": "Sci-fi panel",
+    "values": {
+     "prompt": "worn sci-fi metal floor panels with bolts and scratches"
+    }
+   }
+  ]
+ },
+ "prompt": {
+  "1": {
+   "class_type": "UNETLoader",
+   "_meta": {
+    "title": "Load Diffusion Model"
+   },
+   "inputs": {
+    "unet_name": "flux-2-klein-4b-fp8.safetensors",
+    "weight_dtype": "default"
+   }
+  },
+  "2": {
+   "class_type": "CLIPLoader",
+   "_meta": {
+    "title": "Load CLIP"
+   },
+   "inputs": {
+    "clip_name": "qwen_3_4b.safetensors",
+    "type": "flux2",
+    "device": "default"
+   }
+  },
+  "3": {
+   "class_type": "VAELoader",
+   "_meta": {
+    "title": "Load VAE"
+   },
+   "inputs": {
+    "vae_name": "flux2-vae.safetensors"
+   }
+  },
+  "4": {
+   "class_type": "StringConcatenate",
+   "_meta": {
+    "title": "Texture prompt"
+   },
+   "inputs": {
+    "string_a": "seamless tileable texture, flat top-down orthographic view, even diffuse lighting, no shadows, no perspective, highly detailed material surface:",
+    "string_b": "mossy cobblestone path",
+    "delimiter": " "
+   }
+  },
+  "5": {
+   "class_type": "CLIPTextEncode",
+   "_meta": {
+    "title": "Positive"
+   },
+   "inputs": {
+    "text": [
+     "4",
+     0
+    ],
+    "clip": [
+     "2",
+     0
+    ]
+   }
+  },
+  "6": {
+   "class_type": "ConditioningZeroOut",
+   "_meta": {
+    "title": "Negative (zero)"
+   },
+   "inputs": {
+    "conditioning": [
+     "5",
+     0
+    ]
+   }
+  },
+  "20": {
+   "class_type": "PrimitiveInt",
+   "_meta": {
+    "title": "Width"
+   },
+   "inputs": {
+    "value": 1024
+   }
+  },
+  "21": {
+   "class_type": "PrimitiveInt",
+   "_meta": {
+    "title": "Height"
+   },
+   "inputs": {
+    "value": 1024
+   }
+  },
+  "7": {
+   "class_type": "CFGGuider",
+   "_meta": {
+    "title": "CFG Guider"
+   },
+   "inputs": {
+    "model": [
+     "1",
+     0
+    ],
+    "positive": [
+     "5",
+     0
+    ],
+    "negative": [
+     "6",
+     0
+    ],
+    "cfg": 1.0
+   }
+  },
+  "8": {
+   "class_type": "KSamplerSelect",
+   "_meta": {
+    "title": "Sampler"
+   },
+   "inputs": {
+    "sampler_name": "euler"
+   }
+  },
+  "9": {
+   "class_type": "Flux2Scheduler",
+   "_meta": {
+    "title": "Scheduler"
+   },
+   "inputs": {
+    "steps": 4,
+    "width": [
+     "20",
+     0
+    ],
+    "height": [
+     "21",
+     0
+    ]
+   }
+  },
+  "10": {
+   "class_type": "RandomNoise",
+   "_meta": {
+    "title": "Seed"
+   },
+   "inputs": {
+    "noise_seed": 0
+   }
+  },
+  "11": {
+   "class_type": "EmptyFlux2LatentImage",
+   "_meta": {
+    "title": "Size"
+   },
+   "inputs": {
+    "width": [
+     "20",
+     0
+    ],
+    "height": [
+     "21",
+     0
+    ],
+    "batch_size": 1
+   }
+  },
+  "12": {
+   "class_type": "SamplerCustomAdvanced",
+   "_meta": {
+    "title": "Sample"
+   },
+   "inputs": {
+    "noise": [
+     "10",
+     0
+    ],
+    "guider": [
+     "7",
+     0
+    ],
+    "sampler": [
+     "8",
+     0
+    ],
+    "sigmas": [
+     "9",
+     0
+    ],
+    "latent_image": [
+     "11",
+     0
+    ]
+   }
+  },
+  "13": {
+   "class_type": "VAEDecode",
+   "_meta": {
+    "title": "VAE Decode"
+   },
+   "inputs": {
+    "samples": [
+     "12",
+     0
+    ],
+    "vae": [
+     "3",
+     0
+    ]
+   }
+  },
+  "14": {
+   "class_type": "SaveImage",
+   "_meta": {
+    "title": "Save Image"
+   },
+   "inputs": {
+    "images": [
+     "13",
+     0
+    ],
+    "filename_prefix": "unreal/texture"
+   }
+  }
+ }
+}

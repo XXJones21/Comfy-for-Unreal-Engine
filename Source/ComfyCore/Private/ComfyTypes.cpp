@@ -80,7 +80,7 @@ namespace ComfyTypes
 		return Category;
 	}
 
-	FString PickModel(const TArray<FString>& Options, const TArray<FString>& Prefer, const FString& Fallback)
+	FString MatchModel(const TArray<FString>& Options, const TArray<FString>& Prefer)
 	{
 		for (const FString& Wanted : Prefer)
 		{
@@ -98,6 +98,16 @@ namespace ComfyTypes
 					return Option;
 				}
 			}
+		}
+		return FString();
+	}
+
+	FString PickModel(const TArray<FString>& Options, const TArray<FString>& Prefer, const FString& Fallback)
+	{
+		const FString Match = MatchModel(Options, Prefer);
+		if (!Match.IsEmpty())
+		{
+			return Match;
 		}
 		if (Options.Num() == 0 || Options.Contains(Fallback))
 		{

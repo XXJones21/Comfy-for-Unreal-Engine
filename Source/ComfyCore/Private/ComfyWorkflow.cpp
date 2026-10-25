@@ -357,6 +357,14 @@ void UComfyWorkflow::ApplyManifestObject(const TSharedPtr<FJsonObject>& Manifest
 			Entry->TryGetStringArrayField(TEXT("prefer"), Input.Prefer);
 			Entry->TryGetStringField(TEXT("family"), Input.Family);
 			Entry->TryGetStringField(TEXT("source"), Input.Source);
+			const TSharedPtr<FJsonObject>* Download = nullptr;
+			if (Entry->TryGetObjectField(TEXT("download"), Download) && Download)
+			{
+				(*Download)->TryGetStringField(TEXT("file"), Input.Download.File);
+				(*Download)->TryGetStringField(TEXT("folder"), Input.Download.Folder);
+				(*Download)->TryGetStringField(TEXT("size"), Input.Download.Size);
+				(*Download)->TryGetStringField(TEXT("url"), Input.Download.Url);
+			}
 
 			// The default comes from the graph unless the manifest overrides it.
 			if (!Entry->TryGetStringField(TEXT("default"), Input.DefaultValue))
@@ -395,6 +403,31 @@ void UComfyWorkflow::ApplyManifestObject(const TSharedPtr<FJsonObject>& Manifest
 			if (Entry->TryGetStringField(TEXT("import"), Text))
 			{
 				Output.ImportRule = EComfyImportRule(ParseEnum(StaticEnum<EComfyImportRule>(), Text, int64(Output.ImportRule)));
+			}
+		}
+	}
+
+	const TArray<TSharedPtr<FJsonValue>>* PresetList = nullptr;
+	if (Manifest->TryGetArrayField(TEXT("presets"), PresetList))
+	{
+		Presets.Reset();
+		for (const TSharedPtr<FJsonValue>& Value : *PresetList)
+		{
+			const TSharedPtr<FJsonObject> Entry = Value.IsValid() ? Value->AsObject() : nullptr;
+			const TSharedPtr<FJsonObject>* Values = nullptr;
+			if (!Entry.IsValid() || !Entry->TryGetObjectField(TEXT("values"), Values) || !Values)
+			{
+				continue;
+			}
+			FComfyWorkflowPreset& Preset = Presets.AddDefaulted_GetRef();
+			Entry->TryGetStringField(TEXT("name"), Preset.Name);
+			for (const TPair<FString, TSharedPtr<FJsonValue>>& Pair : (*Values)->Values)
+			{
+				FString PresetValue;
+				if (Pair.Value.IsValid() && Pair.Value->TryGetString(PresetValue))
+				{
+					Preset.Values.Add(Pair.Key, PresetValue);
+				}
 			}
 		}
 	}
