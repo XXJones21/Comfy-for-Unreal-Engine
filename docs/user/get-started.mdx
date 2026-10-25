@@ -1,0 +1,362 @@
+---
+title: "Get started with Comfy for Unreal"
+description: "Install the Comfy for Unreal plugin, connect it to Comfy Cloud or a local ComfyUI, and run your first Workflow from the Unreal Editor."
+---
+
+Comfy for Unreal is an Unreal Engine plugin that runs ComfyUI Workflows from inside the Unreal Editor and imports the results as project assets: textures and materials, sound waves, and static meshes. This page takes you from the plugin zip to a result in your level.
+
+<Note>
+  This is an alpha build for Comfy Org testers. The plugin is marked as beta and experimental.
+</Note>
+
+## Requirements
+
+| Requirement | Details |
+| --- | --- |
+| Unreal Engine | 5.8 |
+| Operating system | Windows. The alpha package is built for Win64 only. |
+| A place to run Workflows | A Comfy account for Comfy Cloud, or Comfy Desktop with a local ComfyUI, or another ComfyUI on your computer or network. |
+
+Enabling the plugin also enables two Epic plugins it depends on: ToolsetRegistry and Python Editor Script Plugin.
+
+The **Graph** view and the Comfy Cloud sign-in use Unreal's embedded web browser.
+
+## Install the plugin
+
+<Steps>
+  <Step title="Download the plugin zip">
+    Download the Comfy for Unreal alpha zip for Unreal Engine 5.8 (Win64).
+
+    {/* PLACEHOLDER: distribution link not decided. Replace this line with the download link. */}
+    **Download link:** `TBD`
+  </Step>
+  <Step title="Unzip it into your project">
+    Unzip the plugin into your project's `Plugins` folder. When you're done, this file exists:
+
+    ```text
+    <YourProject>/Plugins/ComfyUnreal/ComfyUnreal.uplugin
+    ```
+  </Step>
+  <Step title="Enable the plugin">
+    Open the project in Unreal Editor 5.8. Select **Edit > Plugins**, search for **Comfy for Unreal**, and make sure it's enabled.
+  </Step>
+  <Step title="Restart the editor">
+    Save your work, then restart Unreal Editor.
+  </Step>
+</Steps>
+
+{/* SCREENSHOT: the Unreal Plugins window filtered to "Comfy for Unreal", with the plugin enabled. */}
+
+## Open Comfy Studio
+
+- Click the **Comfy** button in the level editor toolbar, or select **Tools > Comfy Studio**.
+
+Comfy Studio has two views. Switch between them with **Run** and **Graph** at the left of the status line.
+
+| View | What it's for |
+| --- | --- |
+| **Run** | Run a Workflow and bring the results into the project. |
+| **Graph** | Edit graphs in ComfyUI on the active backend, and send them to Unreal. |
+
+The status line across the top of the tab stays visible in both views:
+
+| Item | What it does |
+| --- | --- |
+| Backend picker | Selects where Workflows run. The default list is **Desktop**, **Comfy Cloud** and **Comfy Router**. Your choice is saved for you, not for the project. |
+| Status dot and summary | Green when connected, red when not connected, and another color while Studio connects or waits for a Comfy Cloud sign-in. Hover the summary to see the full line and the backend's own message. |
+| **N running** | The number of runs in progress. It appears only while something runs. |
+| **Check** or **Retry** | Checks that the backend answers and accepts your key. |
+| **Settings** | Opens **Project Settings > Plugins > Comfy**, where the backends are defined. |
+
+{/* SCREENSHOT: the Comfy Studio status line with Run | Graph, the backend picker on Comfy Cloud, a green dot, "Connected" with account and credits, and Check and Settings. */}
+
+This page covers **Desktop** and **Comfy Cloud**. **Comfy Router** runs single models through a Comfy API Key and has no graph editor.
+
+## Connect a backend
+
+Select a backend in the status line, then follow the tab that matches it. You're connected when the status line reads **Connected**.
+
+<Tabs>
+  <Tab title="Comfy Cloud with sign-in">
+    1. In the backend picker, select **Comfy Cloud**.
+    2. If no Comfy API Key is set, the **Run** view shows a **Sign in to Comfy Cloud** card. Click **Sign in**.
+    3. Comfy Studio switches to the **Graph** view, which loads Comfy Cloud. Sign in with your Comfy account. Google and GitHub sign-ins open in a separate window.
+    4. Click **Run** in the status line to go back to the **Run** view.
+
+    The status line reads **Connected** followed by **Signed in as** your account name, the free runs you have left, and your Comfy Credits. Runs on Comfy Cloud spend free runs or Comfy Credits, and the status line updates after each run.
+
+    Your sign-in is kept between editor sessions. It's stored in your project's `Saved/Comfy/Browser` folder.
+
+    <Warning>
+      Runs that use your sign-in go through the Comfy Cloud page inside Comfy Studio. Keep the Comfy Studio tab open until they finish. If you close it, the run fails in Unreal but keeps running on Comfy Cloud, and you can find it in the history in the **Graph** view.
+    </Warning>
+
+    {/* SCREENSHOT: the Run view's "Sign in to Comfy Cloud" card with Sign in, Use an API key instead and Use Comfy Desktop instead. */}
+  </Tab>
+  <Tab title="Comfy Cloud with a Comfy API Key">
+    A Comfy API Key lets Comfy Studio run on Comfy Cloud without the sign-in page. The same key is used for Comfy Router, Comfy API deployments and Partner Nodes.
+
+    1. Create a key at [platform.comfy.org/profile/api-keys](https://platform.comfy.org/profile/api-keys).
+    2. Open **Editor Preferences > Plugins > Comfy**. On the **Sign in to Comfy Cloud** card, **Use an API key instead** opens this page for you.
+    3. Paste the key into the key field. The key is saved in your own editor preferences, never in the project's config files.
+    4. In the backend picker, select **Comfy Cloud**, then click **Check** or **Retry**.
+
+    You can also set the key in an environment variable. Comfy Studio reads the key from the first of these sources that has one:
+
+    1. The environment variable named on the backend profile (`COMFY_API_KEY` by default).
+    2. `COMFY_CLOUD_API_KEY`, the variable comfy-cli uses.
+    3. A key set for this editor session from Blueprint, Python or C++.
+    4. **Editor Preferences > Plugins > Comfy**.
+
+    <Note>
+      An environment variable reaches the editor only if the program that launched the editor started after you set it. After you set or change one, restart that program, or start the editor from a terminal opened after the change.
+    </Note>
+
+    If you have both a key and a Comfy Cloud sign-in, Comfy Studio uses the key while Comfy Cloud accepts it, and the sign-in otherwise.
+  </Tab>
+  <Tab title="Comfy Desktop or local ComfyUI">
+    1. Start ComfyUI. In Comfy Desktop, start your local ComfyUI.
+    2. In the backend picker, select **Desktop**.
+
+    Comfy Studio looks for ComfyUI at these addresses, in order, and uses the first one that answers:
+
+    1. The URL on the **Desktop** backend profile (`http://127.0.0.1:8188` by default).
+    2. The ports set on Comfy Desktop's local installations.
+    3. `http://127.0.0.1:8000`
+    4. `http://127.0.0.1:8188`
+
+    The status line reads **Connected** followed by the address it found.
+
+    To use a ComfyUI at another address, click **Settings** in the status line and change the **Desktop** backend's URL in **Project Settings > Plugins > Comfy**.
+
+    <Note>
+      Project Settings are saved in the project's `Config/DefaultGame.ini`, so a changed URL reaches everyone who shares the project through source control. Comfy API Keys are never saved there.
+    </Note>
+
+    If a local Workflow uses Partner Nodes, Comfy Studio sends your Comfy API Key with the run so those Nodes can work. Set the key as described in the **Comfy Cloud with a Comfy API Key** tab.
+  </Tab>
+</Tabs>
+
+## Run a Workflow
+
+1. Click **Run** in the status line.
+2. Choose a Workflow. Click a card under **What do you want to make?**, or open the **Choose a workflow** picker at the top of the left column.
+3. Fill in the input cards in the left column.
+4. Check the options in the **IN UNREAL** card.
+5. Set **Batch** to the number of runs you want.
+6. Click **Run**.
+
+{/* SCREENSHOT: the Run view with a Workflow chosen: the picker, a prompt card, a seed card with Randomize, the IN UNREAL card, Batch and Run. */}
+
+### Choose a Workflow
+
+The picker and the library group Workflows by where they come from, then by type (Material, Texture, Sound, Music, Mesh, Upscale, Other).
+
+| Origin | Where the Workflow comes from |
+| --- | --- |
+| **Project** | A Comfy Workflow asset in your project. See [Add your own Workflow](#add-your-own-workflow). |
+| **Server** | The Workflow library of the connected ComfyUI, when it has the Comfy for Unreal extension. |
+| **Built-in** | Workflows that ship with the plugin. |
+
+The built-in Workflows use ComfyUI's own Nodes only, so they run on Comfy Cloud and on a local ComfyUI. Comfy Cloud has every model they use. On a local ComfyUI, download the models first:
+
+| Workflow | Makes | Model files to download for a local ComfyUI |
+| --- | --- | --- |
+| **Seamless Texture** | A surface texture from a prompt | FLUX.2 Klein 4B: `flux-2-klein-4b-fp8.safetensors` (3.8 GB), `qwen_3_4b.safetensors` (7.5 GB), `flux2-vae.safetensors` (321 MB) |
+| **Texture Restyle** | A changed copy of a texture, from an instruction | The same files as **Seamless Texture** |
+| **Texture Upscale** | A larger, sharper copy of a texture | `RealESRGAN_x4plus.safetensors` (67 MB) |
+| **Sound Effect** | A sound effect or ambience, up to 47 seconds | `stable-audio-open-1.0.safetensors` (4.9 GB), `t5-base.safetensors` (0.9 GB) |
+| **Music Track** | A music track, instrumental by default | `ace_step_1.5_turbo_aio.safetensors` (10 GB) |
+| **Image to Mesh** | An untextured static mesh from one image | `hunyuan3d-dit-v2_fp16.safetensors` (4.9 GB) |
+
+When the backend doesn't have a file, the Workflow's model card names it and shows a **Download** button. See [A model card says "Not found on this backend"](#troubleshooting).
+
+### Fill in the inputs
+
+Some Workflows show a **START FROM** row above the cards. Click a button in it, such as **Brick** or **Snow**, to fill the inputs with a working example, then change what you need. Hover a button to see the values it sets.
+
+Each Workflow decides its own input cards. The cards you can see include:
+
+| Input | How to fill it |
+| --- | --- |
+| Text | Type in the box. The hint reads **Describe what you want**. |
+| Seed | With **Randomize** on, every run gets a seed of its own (**New seed every run**). Turn **Randomize** off to type a fixed seed. |
+| Model or choice | Select from the list. Model lists come from the connected backend, so they change when you switch backends. |
+| Number or toggle | Enter a number, or select the checkbox. |
+| File | Drag a texture or mesh from the Content Browser, or a file from File Explorer, onto **Drop a texture, mesh or file here**. You can also click **Use selection** (the asset selected in the Content Browser), **Viewport** (a capture of the active viewport) or **Browse...**. |
+
+If you leave a texture input empty, **Run** uses the texture selected in the Content Browser. With nothing selected, the message above **Run** says what the input needs, and nothing is sent.
+
+A Workflow with no inputs runs exactly as saved.
+
+### Set the options in Unreal
+
+| Option | Default | What it does |
+| --- | --- | --- |
+| **Import results when they finish** | On | Imports each finished result into the project. |
+| **Make a material from images** | On | Turns an image result into a material instance. |
+| **Tileable, with a derived normal map** | On | Makes the texture tileable and adds a normal map derived from it, for the material. |
+| Content folder | `/Game/Comfy/Generated` | Where imported assets go. |
+
+**Batch** queues from 1 to 16 runs. Each run gets its own seed when the seed is random.
+
+### Watch the run
+
+Each run appears in the result strip at the bottom of the main area, with a progress bar while it runs. The status line counts the runs in progress.
+
+**Run** is unavailable while the backend can't be reached. Hover it to see **Connect a backend first. The status line at the top says what's wrong.**
+
+If a run fails, the message above **Run** reads `<Workflow name> failed:` followed by the backend's error.
+
+## Use a result
+
+Click a result in the strip to show it in the preview. Image results show the image. Other results show their kind and file name, with a button:
+
+- **Play** plays a sound or music result in the editor. Click **Stop** to stop it.
+- **Open mesh** opens a mesh result in the Static Mesh Editor.
+
+If the result isn't imported, these buttons open the file in Windows' default player or 3D viewer instead.
+
+The buttons under the preview work on the selected result:
+
+| Button | What it does |
+| --- | --- |
+| **Import** | Imports the result into the content folder. With **Import results when they finish** on, this already happened. |
+| **Replace on selection** | Imports the result if needed, then puts it on the actors selected in the level. A material goes on every material slot of their mesh components. A static mesh replaces the mesh on their static mesh components. |
+| **Revert** | Puts back the materials and meshes that **Replace on selection** changed. The imported assets stay in the project. |
+| **Show in Content Browser** | Imports the result if needed and selects its assets in the Content Browser. |
+| **Open in Graph** | Opens the result's Workflow in the **Graph** view. |
+
+{/* SCREENSHOT: the gallery with a texture result in the preview, the action buttons, and the result strip with one run in progress. */}
+
+**Replace on selection** works with materials and static meshes. For a texture result, turn on **Make a material from images** first. You can also undo a replace with `Ctrl+Z`.
+
+Results import as these asset types:
+
+| Result | Unreal asset |
+| --- | --- |
+| Image or texture | Texture2D |
+| Sound or music | SoundWave |
+| Mesh | StaticMesh |
+
+## Find earlier runs
+
+After your first run, a **Project runs** button appears under **Run**. It shows how many runs the project has and when the last one ran.
+
+- Click **Project runs** to list the project's runs, newest first. Hover a run to see the inputs it used.
+- Click a run to show its result again. Its Workflow and inputs go back into the form, so you can run it again as is or with a change. Seeds aren't restored.
+
+The list shows the 50 most recent runs. Every run and its output files are kept in your project's `Saved/Comfy/Jobs` folder, so the list survives editor restarts.
+
+{/* SCREENSHOT: the Project runs list open, with thumbnails, titles and times. */}
+
+## Add your own Workflow
+
+You can bring a ComfyUI graph into Comfy Studio in two ways. Both create a Comfy Workflow asset that appears under **Project** in the picker.
+
+**From the Graph view:**
+
+1. Click **Graph** in the status line. The view loads the ComfyUI of the active backend (**Desktop** or **Comfy Cloud**).
+2. Build or open your graph.
+3. Click **Send to Unreal** above the graph.
+
+The Workflow is saved as a Comfy Workflow asset in `/Game/Comfy/Workflows`.
+
+**From a file:**
+
+1. In ComfyUI, save your Workflow with **Export (API)**.
+2. In the Content Browser, drag the `.json` file in, or import it.
+
+The Content Browser refuses a regular ComfyUI save (the canvas format) and asks you to use **Export (API)** instead.
+
+Comfy Studio builds the input cards in this order of preference:
+
+1. The `comfy_unreal` manifest stored in the Workflow.
+2. The inputs chosen in ComfyUI's App Mode, when the Workflow has them.
+3. Detection of common inputs, such as prompts, seeds, sizes, steps, model names, and load and save Nodes.
+
+The manifest format is described in `docs/MANIFEST.md` in the plugin folder.
+
+### The optional ComfyUI extension
+
+The Comfy for Unreal extension for ComfyUI lets a Workflow author choose exactly what Unreal sees. You don't need it to use Comfy Studio. It adds no compute Nodes, so a tagged Workflow still runs unchanged on Comfy Cloud. It adds:
+
+- **Comfy for Unreal > Expose input to Unreal...** and **Comfy for Unreal > Tag output for Unreal...** on a Node's right-click menu.
+- A **Send to Unreal** button in ComfyUI's action bar.
+- An **Unreal** sidebar tab that lists the Workflows saved in the ComfyUI server's library. Comfy Studio lists those Workflows under **Server**.
+
+{/* PLACEHOLDER: how alpha testers install the ComfyUI extension is not decided. */}
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="The Run view shows &quot;Connect Comfy&quot;">
+    Comfy Studio found no ComfyUI for the **Desktop** backend. The card says why, based on what Comfy Desktop has installed, and the line under it lists the addresses it tried:
+
+    | Card text starts with | What to do |
+    | --- | --- |
+    | **Comfy Desktop is installed, but it only has Comfy Cloud.** | Add a local ComfyUI in Comfy Desktop, or click **Use Comfy Cloud**. |
+    | **Comfy Desktop has a local ComfyUI, but it isn't running.** | Start it in Comfy Desktop, then click **Retry** in the status line. |
+    | **Run workflows on your own GPU with Comfy Desktop, or on Comfy Cloud from any computer.** | Comfy Studio didn't find Comfy Desktop. Click **Get Comfy Desktop**, or **Use Comfy Cloud**. |
+
+    If your ComfyUI runs on another address, click **Connect to a URL...** and change the **Desktop** backend's URL in **Project Settings > Plugins > Comfy**.
+  </Accordion>
+  <Accordion title="The Run view shows &quot;Sign in to Comfy Cloud&quot;">
+    Comfy Cloud is the active backend and Comfy Studio has no Comfy API Key and no sign-in.
+
+    - Click **Sign in** and sign in on the Comfy Cloud page in the **Graph** view.
+    - Click **Use an API key instead** to open **Editor Preferences > Plugins > Comfy** and paste a key.
+    - Click **Use Comfy Desktop instead** to switch to the **Desktop** backend.
+  </Accordion>
+  <Accordion title="The Run view shows &quot;Comfy Cloud refused your API key&quot;">
+    Comfy Cloud rejected the key, and you aren't signed in. The card says where the key came from:
+
+    - **An environment variable:** the variable may hold an old or revoked key. Change or remove it, then restart Unreal and the program that launches it. Or click **Sign in instead**.
+    - **Editor Preferences:** the key may be old, revoked or mistyped. Click **Replace key** to paste another one, **Remove key** to delete it, or **Sign in instead**.
+    - **This session:** a key set from Blueprint, Python or C++ was refused. Click **Sign in instead**.
+
+    Comfy Studio doesn't send a refused key again until the key changes. Hover the card text to see Comfy Cloud's own message.
+  </Accordion>
+  <Accordion title="A notice says &quot;Running with your Comfy sign-in&quot;">
+    Comfy Cloud refused your Comfy API Key, but you're signed in, so Comfy Studio runs with the sign-in and ignores the key. Runs work. To clear the notice, fix or remove the key. If the key is in Editor Preferences, click **Remove key** on the notice.
+  </Accordion>
+  <Accordion title="A notice says &quot;Can't reach&quot; a backend">
+    The active backend didn't answer, and the notice includes the reason. Click **Settings** to check the backend's URL in **Project Settings > Plugins > Comfy**, then click **Retry** in the status line.
+  </Accordion>
+  <Accordion title="I'm out of free runs or Comfy Credits">
+    When you're signed in, the status line shows your free runs left and your Comfy Credits. Check it before you run on Comfy Cloud.
+
+    When a run made with a Comfy API Key fails because the account has no Comfy Credits left, the error reads **out of credits (402). Add credits at platform.comfy.org.**
+
+    {/* PLACEHOLDER: where testers add Comfy Credits or upgrade, and what a sign-in run shows at 0 credits, is not verified. */}
+  </Accordion>
+  <Accordion title="A model card says &quot;Not found on this backend&quot;">
+    The backend doesn't have a model file the Workflow needs. Comfy Studio doesn't swap in another file, because a different model gives wrong results or fails partway through. **Run** stops and lists every missing file with its size, its folder and a download link.
+
+    1. Click **Download** on the model card.
+    2. Save the file in the folder the card names, under `ComfyUI/models`.
+    3. Click **Retry** in the status line. If the file still isn't listed, restart ComfyUI and click **Retry** again.
+
+    You can also select another file in the model card's list if you know it works with the Workflow.
+  </Accordion>
+  <Accordion title="A Comfy Cloud run failed after I closed Comfy Studio">
+    Runs that use your sign-in need the Comfy Studio tab open. The run keeps going on Comfy Cloud. Open Comfy Studio and find it in the history in the **Graph** view.
+  </Accordion>
+  <Accordion title="The Graph view doesn't show ComfyUI">
+    - If Unreal's embedded web browser isn't available, the **Graph** view says so. Click **Open in browser** to open the same ComfyUI in your web browser.
+    - The **Comfy Router** backend has no graph editor. Switch to **Desktop** or **Comfy Cloud**.
+    - Click **Reload** to load the page again.
+  </Accordion>
+  <Accordion title="Replace on selection does nothing">
+    - Select one or more actors in the level first.
+    - **Replace on selection** works with materials and static meshes. For a texture result, turn on **Make a material from images** and try again.
+  </Accordion>
+</AccordionGroup>
+
+## Send feedback
+
+{/* PLACEHOLDER: the alpha feedback channel is not decided. Replace this section's text with the channel. */}
+
+**Feedback channel:** `TBD`
+
+When you report a problem, include the status line text (hover it for the full message) and the error shown above **Run**.
