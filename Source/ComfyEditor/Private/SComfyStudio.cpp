@@ -167,6 +167,13 @@ TSharedRef<SWidget> SComfyStudio::BuildStatusLine()
 				.TextStyle(&Style, "Comfy.Text.Muted")
 				.Text(this, &SComfyStudio::GetStatusText)
 				.OverflowPolicy(ETextOverflowPolicy::Ellipsis)
+				.ToolTipText_Lambda([this]()
+				{
+					// The whole line, which the panel may cut short, and the backend's own words.
+					const UComfySubsystem* Comfy = UComfySubsystem::Get();
+					const FString Detail = Comfy ? Comfy->GetLastStatus(Comfy->GetActiveBackend()).Detail : FString();
+					return Detail.IsEmpty() ? GetStatusText() : FText::Format(LOCTEXT("StatusTooltip", "{0}\n\n{1}"), GetStatusText(), FText::FromString(Detail));
+				})
 			]
 			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(8, 0)
 			[

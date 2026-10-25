@@ -130,12 +130,20 @@ void SComfyRunView::Construct(const FArguments& InArgs)
 						]
 						+ SScrollBox::Slot().Padding(0, 0, 8, 8)
 						[
-							BuildOptionsCard()
+							SNew(SBox)
+							.Visibility_Lambda([this]() { return SelectedWorkflow.IsValid() ? EVisibility::Visible : EVisibility::Collapsed; })
+							[
+								BuildOptionsCard()
+							]
 						]
 					]
 					+ SVerticalBox::Slot().AutoHeight().Padding(12, 8, 12, 12)
 					[
-						BuildRunBar()
+						SNew(SBox)
+						.Visibility_Lambda([this]() { return SelectedWorkflow.IsValid() ? EVisibility::Visible : EVisibility::Collapsed; })
+						[
+							BuildRunBar()
+						]
 					]
 				]
 			]
@@ -172,6 +180,7 @@ void SComfyRunView::Construct(const FArguments& InArgs)
 		});
 	}
 	RefreshWorkflows();
+	RebuildForm();
 	RebuildStrip();
 }
 
@@ -333,11 +342,15 @@ TSharedPtr<SWidget> SComfyRunView::MakeWelcomeCard() const
 {
 	UComfySubsystem* Comfy = UComfySubsystem::Get();
 	FComfyBackendProfile Profile;
-	if (!Comfy || !ActiveStatus.IsSet() || ActiveStatus->bReachable || ActiveStatus->Backend != Comfy->GetActiveBackend() || !Comfy->GetBackendProfile(NAME_None, Profile))
+	if (!Comfy || !ActiveStatus.IsSet() || ActiveStatus->Backend != Comfy->GetActiveBackend() || !Comfy->GetBackendProfile(NAME_None, Profile))
 	{
 		return nullptr;
 	}
 	const FComfyBackendStatus& Active = ActiveStatus.GetValue();
+	if (Active.bReachable && !Active.bApiKeyRefused)
+	{
+		return nullptr;
+	}
 
 	// The first backend of each kind, for "use ... instead".
 	FName CloudName, LocalName;
@@ -366,9 +379,57 @@ TSharedPtr<SWidget> SComfyRunView::MakeWelcomeCard() const
 	auto ShowSettings = [](FName Container, FName Section) { return [Container, Section]() { FModuleManager::LoadModuleChecked<ISettingsModule>("Settings").ShowViewer(Container, "Plugins", Section); }; };
 	const FSimpleDelegate CheckBackend = OnCheckBackend;
 	const FSimpleDelegate ShowGraph = OnShowGraph;
+	auto RemoveSavedKey = [CheckBackend]()
+	{
+		UComfyUserSettings* User = GetMutableDefault<UComfyUserSettings>();
+		User->ApiKey.Reset();
+		User->SaveConfig();
+		CheckBackend.ExecuteIfBound();
+	};
+	const bool bKeyFromEnvironment = Active.KeySource == EComfyApiKeySource::Environment;
+	const bool bKeyFromPreferences = Active.KeySource == EComfyApiKeySource::EditorPreferences;
+
+	// One line, not a card: a notice beside the library, or an error that has no first-run story.
+	auto Banner = [&Buttons](const FText& Text, const FString& Tooltip, bool bError) -> TSharedPtr<SWidget>
+	{
+		return SNew(SBox)
+			.MaxDesiredWidth(760.f)
+			.HAlign(HAlign_Left)
+			[
+				SNew(SBorder)
+				.BorderImage(Style().GetBrush(bError ? "Comfy.Banner.Error" : "Comfy.Banner"))
+				.Padding(FMargin(12, 8))
+				[
+					SNew(SHorizontalBox)
+					+ SHorizontalBox::Slot().FillWidth(1.f).VAlign(VAlign_Center)
+					[
+						SNew(STextBlock).TextStyle(&Style(), "Comfy.Text").AutoWrapText(true).Text(Text)
+						.ToolTipText(Tooltip.IsEmpty() ? FText::GetEmpty() : FText::FromString(Tooltip))
+					]
+					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(12, 0, 0, 0)
+					[
+						Buttons
+					]
+				]
+			];
+	};
+
+	if (Active.bReachable)
+	{
+		// Running with the sign-in because the key was refused: say so without getting in the way.
+		if (bKeyFromPreferences)
+		{
+			AddButton(LOCTEXT("RemoveKey", "Remove key"), RemoveSavedKey, "Comfy.Button.Ghost");
+		}
+		return Banner(bKeyFromEnvironment
+			? FText::Format(LOCTEXT("RefusedSignedInEnv", "Running with your Comfy sign-in. Comfy Cloud refused the API key in {0}, so it isn't used."), FText::FromString(Active.KeySourceName))
+			: LOCTEXT("RefusedSignedIn", "Running with your Comfy sign-in. Comfy Cloud refused your saved API key, so it isn't used."),
+			Active.Detail, false);
+	}
 
 	FText Title;
 	FText Body;
+	FText BodyTooltip;
 	FText Detail;
 	if (Profile.Kind == EComfyBackendKind::Local)
 	{
@@ -379,7 +440,7 @@ TSharedPtr<SWidget> SComfyRunView::MakeWelcomeCard() const
 			Body = LOCTEXT("WelcomeNoLocal", "Comfy Desktop is installed, but it only has Comfy Cloud. Add a local ComfyUI in Comfy Desktop to run on your own GPU, or use Comfy Cloud here.");
 			break;
 		case EComfyDesktopInstall::HasLocal:
-			Body = LOCTEXT("WelcomeNotRunning", "Comfy Desktop has a local ComfyUI, but it isn't running. Start it in Comfy Desktop, then try again.");
+			Body = LOCTEXT("WelcomeNotRunning", "Comfy Desktop has a local ComfyUI, but it isn't running. Start it in Comfy Desktop, then press Retry above.");
 			break;
 		default:
 			Body = LOCTEXT("WelcomeNothing", "Run workflows on your own GPU with Comfy Desktop, or on Comfy Cloud from any computer.");
@@ -394,8 +455,35 @@ TSharedPtr<SWidget> SComfyRunView::MakeWelcomeCard() const
 		{
 			AddButton(LOCTEXT("GetDesktop", "Get Comfy Desktop"), []() { FPlatformProcess::LaunchURL(TEXT("https://www.comfy.org/download"), nullptr, nullptr); }, "Comfy.Button");
 		}
-		AddButton(LOCTEXT("TryAgain", "Try again"), [CheckBackend]() { CheckBackend.ExecuteIfBound(); }, "Comfy.Button");
 		AddButton(LOCTEXT("ConnectUrl", "Connect to a URL..."), ShowSettings("Project", "ComfySettings"), "Comfy.Button.Ghost");
+	}
+	else if (Active.bNeedsSignIn && Active.bApiKeyRefused)
+	{
+		Title = LOCTEXT("RefusedTitle", "Comfy Cloud refused your API key");
+		if (bKeyFromEnvironment)
+		{
+			Body = FText::Format(LOCTEXT("RefusedEnv", "The key comes from the {0} environment variable, which may hold an old or revoked key. Sign in with your Comfy account instead, or change or remove {0} and restart Unreal."),
+				FText::FromString(Active.KeySourceName));
+		}
+		else if (bKeyFromPreferences)
+		{
+			Body = LOCTEXT("RefusedPrefs", "The key saved in Editor Preferences may be old, revoked or mistyped. Sign in with your Comfy account instead, or replace the key.");
+		}
+		else
+		{
+			Body = LOCTEXT("RefusedSession", "The key set for this session was refused. Sign in with your Comfy account instead.");
+		}
+		BodyTooltip = FText::FromString(Active.Detail);
+		AddButton(LOCTEXT("SignInInstead", "Sign in instead"), [ShowGraph]() { ShowGraph.ExecuteIfBound(); }, "Comfy.Button.Primary");
+		if (bKeyFromPreferences)
+		{
+			AddButton(LOCTEXT("ReplaceKey", "Replace key"), ShowSettings("Editor", "ComfyUserSettings"), "Comfy.Button");
+			AddButton(LOCTEXT("RemoveKey", "Remove key"), RemoveSavedKey, "Comfy.Button.Ghost");
+		}
+		else
+		{
+			AddButton(LOCTEXT("GetKey", "Get a new key"), []() { FPlatformProcess::LaunchURL(TEXT("https://platform.comfy.org/profile/api-keys"), nullptr, nullptr); }, "Comfy.Button");
+		}
 	}
 	else if (Active.bNeedsSignIn)
 	{
@@ -410,10 +498,9 @@ TSharedPtr<SWidget> SComfyRunView::MakeWelcomeCard() const
 	}
 	else
 	{
-		Title = FText::Format(LOCTEXT("WelcomeOtherTitle", "{0} isn't connected"), FText::FromName(Profile.Name));
-		Body = FText::FromString(Active.Summary);
-		AddButton(LOCTEXT("TryAgain", "Try again"), [CheckBackend]() { CheckBackend.ExecuteIfBound(); }, "Comfy.Button.Primary");
+		// Retry lives in the status line above.
 		AddButton(LOCTEXT("Settings", "Settings"), ShowSettings("Project", "ComfySettings"), "Comfy.Button.Ghost");
+		return Banner(FText::Format(LOCTEXT("OtherNotConnected", "Can't reach {0}. {1}"), FText::FromName(Profile.Name), FText::FromString(Active.Summary)), Active.Detail, true);
 	}
 
 	return SNew(SBox)
@@ -436,7 +523,7 @@ TSharedPtr<SWidget> SComfyRunView::MakeWelcomeCard() const
 				]
 				+ SVerticalBox::Slot().AutoHeight().Padding(0, 0, 0, 6)
 				[
-					SNew(STextBlock).TextStyle(&Style(), "Comfy.Text").AutoWrapText(true).Text(Body)
+					SNew(STextBlock).TextStyle(&Style(), "Comfy.Text").AutoWrapText(true).Text(Body).ToolTipText(BodyTooltip)
 				]
 				+ SVerticalBox::Slot().AutoHeight().Padding(0, 0, 0, 14)
 				[
@@ -479,23 +566,47 @@ void SComfyRunView::RebuildEmptyState()
 			}
 			++Count;
 			TWeakObjectPtr<UComfyWorkflow> Captured = Workflow;
+			const FText Name = FText::FromString(Workflow->GetDisplayNameString());
+			// Workflows sent without a description say what they take instead.
+			FText Description = Workflow->Description;
+			if (Description.IsEmpty())
+			{
+				TArray<FString> Labels;
+				for (const FComfyWorkflowInput& Input : Workflow->Inputs)
+				{
+					Labels.Add(Input.Label.IsEmpty() ? FName::NameToDisplayString(Input.Name, false) : Input.Label);
+				}
+				Description = Labels.Num() > 0
+					? FText::Format(LOCTEXT("CardInputs", "Inputs: {0}"), FText::FromString(FString::Join(Labels, TEXT(", "))))
+					: LOCTEXT("CardNoInputs", "No inputs. Runs exactly as saved.");
+			}
 			Cards->AddSlot()
 			[
-				SNew(SBox).WidthOverride(240.f).HeightOverride(120.f)
+				SNew(SBox).WidthOverride(240.f).HeightOverride(108.f)
 				[
 					SNew(SButton)
 					.ButtonStyle(&Style(), "Comfy.Button")
+					.ContentPadding(FMargin(12, 10))
+					.ToolTipText(FText::Format(LOCTEXT("CardTooltip", "{0}\n{1}"), Name, Description))
 					.OnClicked_Lambda([this, Captured]() { SelectWorkflow(Captured.Get()); return FReply::Handled(); })
 					[
 						SNew(SVerticalBox)
-						+ SVerticalBox::Slot().AutoHeight().Padding(0, 4, 0, 6)
+						+ SVerticalBox::Slot().AutoHeight().Padding(0, 0, 0, 4)
 						[
-							SNew(STextBlock).TextStyle(&Style(), "Comfy.Text.Title").AutoWrapText(true).Text(FText::FromString(Workflow->GetDisplayNameString()))
+							SNew(STextBlock).TextStyle(&Style(), "Comfy.Text.Title").OverflowPolicy(ETextOverflowPolicy::Ellipsis).Text(Name)
+						]
+						+ SVerticalBox::Slot().AutoHeight()
+						[
+							// Two lines at most.
+							SNew(SBox).MaxDesiredHeight(30.f).Clipping(EWidgetClipping::ClipToBounds)
+							[
+								SNew(STextBlock).TextStyle(&Style(), "Comfy.Text.Muted").AutoWrapText(true).OverflowPolicy(ETextOverflowPolicy::MultilineEllipsis)
+								.Text(Description)
+							]
 						]
 						+ SVerticalBox::Slot().FillHeight(1.f)
 						[
-							SNew(STextBlock).TextStyle(&Style(), "Comfy.Text.Muted").AutoWrapText(true).OverflowPolicy(ETextOverflowPolicy::Ellipsis)
-							.Text(Workflow->Description)
+							SNullWidget::NullWidget
 						]
 						+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Left)
 						[
@@ -543,8 +654,9 @@ void SComfyRunView::HandleBackendStatus(const FComfyBackendStatus& BackendStatus
 	if (Comfy && BackendStatus.Backend == Comfy->GetActiveBackend())
 	{
 		ActiveStatus = BackendStatus;
-		const FString Key = BackendStatus.bReachable ? FString() : FString::Printf(TEXT("%s|%d|%d|%s"), *BackendStatus.Backend.ToString(),
-			int32(BackendStatus.DesktopInstall), BackendStatus.bNeedsSignIn ? 1 : 0, *BackendStatus.Summary);
+		const FString Key = BackendStatus.bReachable && !BackendStatus.bApiKeyRefused ? FString() : FString::Printf(TEXT("%s|%d|%d|%d|%d|%d|%s"), *BackendStatus.Backend.ToString(),
+			BackendStatus.bReachable ? 1 : 0, int32(BackendStatus.DesktopInstall), BackendStatus.bNeedsSignIn ? 1 : 0, BackendStatus.bApiKeyRefused ? 1 : 0, int32(BackendStatus.KeySource),
+			BackendStatus.bReachable ? TEXT("") : *BackendStatus.Summary);
 		if (Key != WelcomeKey)
 		{
 			WelcomeKey = Key;
@@ -596,6 +708,11 @@ void SComfyRunView::RebuildForm()
 	const UComfyWorkflow* Workflow = SelectedWorkflow.Get();
 	if (!Workflow)
 	{
+		FormBox->AddSlot().AutoHeight().Padding(2, 4, 0, 0)
+		[
+			SNew(STextBlock).TextStyle(&Style(), "Comfy.Text.Muted").AutoWrapText(true)
+			.Text(LOCTEXT("NoWorkflow", "Choose a workflow above or from the library. Its inputs appear here."))
+		];
 		return;
 	}
 	if (!Workflow->Description.IsEmpty())
@@ -914,9 +1031,13 @@ TSharedRef<SWidget> SComfyRunView::BuildRunBar()
 		+ SVerticalBox::Slot().AutoHeight()
 		[
 			SNew(SHorizontalBox)
+			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0, 0, 6, 0)
+			[
+				SNew(STextBlock).TextStyle(&Style(), "Comfy.Text.Muted").Text(LOCTEXT("Batch", "Batch"))
+			]
 			+ SHorizontalBox::Slot().AutoWidth().Padding(0, 0, 8, 0)
 			[
-				SNew(SBox).WidthOverride(72.f).HeightOverride(40.f).ToolTipText(LOCTEXT("BatchTooltip", "How many runs to queue"))
+				SNew(SBox).WidthOverride(56.f).HeightOverride(40.f).ToolTipText(LOCTEXT("BatchTooltip", "How many runs to queue, each with its own seed when the seed is random"))
 				[
 					SNew(SSpinBox<int32>)
 					.MinValue(1).MaxValue(16).MinSliderValue(1).MaxSliderValue(16)
@@ -932,6 +1053,7 @@ TSharedRef<SWidget> SComfyRunView::BuildRunBar()
 					.ButtonStyle(&Style(), "Comfy.Button.Primary")
 					.HAlign(HAlign_Center).VAlign(VAlign_Center)
 					.IsEnabled(this, &SComfyRunView::CanRun)
+					.ToolTipText_Lambda([this]() { return CanRun() ? FText::GetEmpty() : LOCTEXT("RunDisabled", "Connect a backend first. The status line at the top says what's wrong."); })
 					.OnClicked(this, &SComfyRunView::OnRun)
 					[
 						SNew(STextBlock).TextStyle(&Style(), "Comfy.Text.Title").Text(LOCTEXT("Run", "Run"))
@@ -943,7 +1065,8 @@ TSharedRef<SWidget> SComfyRunView::BuildRunBar()
 
 bool SComfyRunView::CanRun() const
 {
-	return SelectedWorkflow.IsValid();
+	// Not while the active backend is known to be unreachable: the run would only fail.
+	return SelectedWorkflow.IsValid() && (!ActiveStatus.IsSet() || ActiveStatus->bReachable);
 }
 
 FReply SComfyRunView::OnRun()

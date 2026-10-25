@@ -156,6 +156,10 @@ public:
 	TSharedPtr<IComfyPageChannel> GetPageChannel() const { return PageChannel; }
 
 	FString ResolveApiKey(const FComfyBackendProfile& Profile) const;
+	/** Where ResolveApiKey's key comes from; OutName is the environment variable's name for Environment. */
+	EComfyApiKeySource GetApiKeySource(const FComfyBackendProfile& Profile, FString& OutName) const;
+	/** True when the profile's current key was refused by its backend. A different key is tried again. */
+	bool IsApiKeyRefused(const FComfyBackendProfile& Profile) const;
 
 	// C++ forms of the Router queries, which report errors as well as results.
 	void GetRouterModelSchemaNative(const FString& ModelId, TFunction<void(bool, const FString&)> OnResult, FName Backend = NAME_None);
@@ -211,4 +215,7 @@ private:
 	TMap<FName, FString> ResolvedUrls;
 	FComfyCloudAccount CloudAccount;
 	TSharedPtr<IComfyPageChannel> PageChannel;
+	/** Per profile: a hash of the key its backend refused, and what the backend said. */
+	TMap<FName, FString> RefusedKeyHashes;
+	TMap<FName, FString> RefusedKeyDetails;
 };

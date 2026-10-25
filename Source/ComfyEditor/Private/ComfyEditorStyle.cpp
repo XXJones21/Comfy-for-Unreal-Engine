@@ -4,6 +4,7 @@
 #include "Brushes/SlateRoundedBoxBrush.h"
 #include "Interfaces/IPluginManager.h"
 #include "Styling/AppStyle.h"
+#include "Styling/CoreStyle.h"
 #include "Styling/SlateStyleRegistry.h"
 #include "Styling/SlateTypes.h"
 #include "Textures/SlateIcon.h"
@@ -33,7 +34,8 @@ namespace ComfyEditorStylePrivate
 	{
 		const FSlateRoundedBoxBrush NormalBrush(Normal, Radius, Outline, Outline.A > 0.f ? 1.f : 0.f);
 		const FSlateRoundedBoxBrush HoverBrush(Hovered, Radius, Outline, Outline.A > 0.f ? 1.f : 0.f);
-		const FSlateRoundedBoxBrush DisabledBrush(Normal.CopyWithNewOpacity(0.4f), Radius);
+		// Disabled buttons all look alike: a flat card with muted text, never a faded accent.
+		const FSlateRoundedBoxBrush DisabledBrush(Normal.A > 0.f ? FComfyEditorStyle::FPalette::Card : FLinearColor::Transparent, Radius, FComfyEditorStyle::FPalette::Stroke, Normal.A > 0.f ? 1.f : 0.f);
 		return FButtonStyle()
 			.SetNormal(NormalBrush)
 			.SetHovered(HoverBrush)
@@ -79,13 +81,19 @@ void FComfyEditorStyle::Register()
 	StyleSet->Set("Comfy.Button", MakeButton(FPalette::Card, FPalette::CardHover, FLinearColor::Transparent, RadiusLg));
 	StyleSet->Set("Comfy.Button.Ghost", MakeButton(FLinearColor::Transparent, FPalette::CardHover, FLinearColor::Transparent, RadiusLg));
 
-	// Text: the frontend uses Inter; Roboto, the editor's font, is the closest bundled face.
+	// Text: the frontend uses Inter; Roboto, the editor's font, is the closest bundled face. The editor's
+	// heading fonts are Roboto Bold Condensed, so headings use plain Roboto Bold to read like the frontend.
 	const FTextBlockStyle Normal = FTextBlockStyle(FAppStyle::GetWidgetStyle<FTextBlockStyle>("NormalText")).SetColorAndOpacity(FPalette::Text);
-	StyleSet->Set("Comfy.Text", FTextBlockStyle(Normal).SetFont(FAppStyle::GetFontStyle("NormalFont")));
-	StyleSet->Set("Comfy.Text.Muted", FTextBlockStyle(Normal).SetFont(FAppStyle::GetFontStyle("SmallFont")).SetColorAndOpacity(FPalette::TextMuted));
-	StyleSet->Set("Comfy.Text.Label", FTextBlockStyle(Normal).SetFont(FAppStyle::GetFontStyle("SmallFontBold")).SetColorAndOpacity(FPalette::TextMuted));
-	StyleSet->Set("Comfy.Text.Title", FTextBlockStyle(Normal).SetFont(FAppStyle::GetFontStyle("HeadingExtraSmall")));
-	StyleSet->Set("Comfy.Text.Large", FTextBlockStyle(Normal).SetFont(FAppStyle::GetFontStyle("HeadingSmall")));
+	StyleSet->Set("Comfy.Text", FTextBlockStyle(Normal).SetFont(FCoreStyle::GetDefaultFontStyle("Regular", 10)));
+	StyleSet->Set("Comfy.Text.Muted", FTextBlockStyle(Normal).SetFont(FCoreStyle::GetDefaultFontStyle("Regular", 9)).SetColorAndOpacity(FPalette::TextMuted));
+	StyleSet->Set("Comfy.Text.Label", FTextBlockStyle(Normal).SetFont(FCoreStyle::GetDefaultFontStyle("Bold", 8)).SetColorAndOpacity(FPalette::TextMuted));
+	StyleSet->Set("Comfy.Text.Title", FTextBlockStyle(Normal).SetFont(FCoreStyle::GetDefaultFontStyle("Bold", 11)));
+	StyleSet->Set("Comfy.Text.Large", FTextBlockStyle(Normal).SetFont(FCoreStyle::GetDefaultFontStyle("Bold", 15)));
+	StyleSet->Set("Comfy.Text.Error", FTextBlockStyle(Normal).SetFont(FCoreStyle::GetDefaultFontStyle("Regular", 9)).SetColorAndOpacity(FPalette::Danger));
+
+	// A one-line notice above the library: a tinted strip with a colored edge.
+	StyleSet->Set("Comfy.Banner", new FSlateRoundedBoxBrush(FPalette::Card, RadiusLg, FPalette::Border, 1.f));
+	StyleSet->Set("Comfy.Banner.Error", new FSlateRoundedBoxBrush(FLinearColor::LerpUsingHSV(FPalette::Card, FPalette::Danger, 0.12f), RadiusLg, FPalette::Danger.CopyWithNewOpacity(0.6f), 1.f));
 
 	FSlateStyleRegistry::RegisterSlateStyle(*StyleSet);
 }

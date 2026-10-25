@@ -38,6 +38,7 @@ void FComfyApiV2Backend::Probe(TFunction<void(const FComfyBackendStatus&)> Callb
 	{
 		if (!Response.bConnected || (Response.Code != 404 && !Response.IsOk()))
 		{
+			Status.bApiKeyRefused = Response.bConnected && (Response.Code == 401 || Response.Code == 403);
 			Status.Summary = Response.Describe(FString::Printf(TEXT("Comfy API v2 at %s"), *Base));
 			Callback(Status);
 			return;

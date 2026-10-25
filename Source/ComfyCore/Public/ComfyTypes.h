@@ -274,6 +274,19 @@ enum class EComfyDesktopInstall : uint8
 	HasLocal,
 };
 
+/** Where the API key a backend uses comes from. */
+UENUM(BlueprintType)
+enum class EComfyApiKeySource : uint8
+{
+	None,
+	/** An environment variable: only changing or removing it, then restarting the editor, replaces it. */
+	Environment,
+	/** Set for this editor session (SetSessionApiKey). */
+	Session,
+	/** Editor Preferences > Plugins > Comfy. */
+	EditorPreferences,
+};
+
 /** Result of probing a backend. */
 USTRUCT(BlueprintType)
 struct COMFYCORE_API FComfyBackendStatus
@@ -301,6 +314,21 @@ struct COMFYCORE_API FComfyBackendStatus
 	/** Comfy Cloud only: true when neither an API key nor a signed-in Comfy Studio page is available. */
 	UPROPERTY(BlueprintReadOnly, Category = "Comfy")
 	bool bNeedsSignIn = false;
+
+	/** The backend refused the API key (401/403). Comfy Cloud then runs through the sign-in, if there is one. */
+	UPROPERTY(BlueprintReadOnly, Category = "Comfy")
+	bool bApiKeyRefused = false;
+
+	/** Where the API key comes from, and its name ("COMFY_API_KEY") when that's an environment variable. */
+	UPROPERTY(BlueprintReadOnly, Category = "Comfy")
+	EComfyApiKeySource KeySource = EComfyApiKeySource::None;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Comfy")
+	FString KeySourceName;
+
+	/** The backend's own words when Summary puts them plainly, for tooltips. */
+	UPROPERTY(BlueprintReadOnly, Category = "Comfy")
+	FString Detail;
 
 	/** Node classes the backend reports (native backends only; empty when unknown). */
 	TSet<FString> NodeClasses;

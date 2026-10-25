@@ -172,11 +172,39 @@ FString UComfySubsystem::ResolveApiKey(const FComfyBackendProfile& Profile) cons
 	return GetDefault<UComfyUserSettings>()->ApiKey;
 }
 
+EComfyApiKeySource UComfySubsystem::GetApiKeySource(const FComfyBackendProfile& Profile, FString& OutName) const
+{
+	// The same order as ResolveApiKey.
+	OutName.Reset();
+	if (!Profile.ApiKeyEnvironmentVariable.IsEmpty() && !FPlatformMisc::GetEnvironmentVariable(*Profile.ApiKeyEnvironmentVariable).IsEmpty())
+	{
+		OutName = Profile.ApiKeyEnvironmentVariable;
+		return EComfyApiKeySource::Environment;
+	}
+	if (!FPlatformMisc::GetEnvironmentVariable(TEXT("COMFY_CLOUD_API_KEY")).IsEmpty())
+	{
+		OutName = TEXT("COMFY_CLOUD_API_KEY");
+		return EComfyApiKeySource::Environment;
+	}
+	if (!SessionApiKey.IsEmpty())
+	{
+		return EComfyApiKeySource::Session;
+	}
+	return GetDefault<UComfyUserSettings>()->ApiKey.IsEmpty() ? EComfyApiKeySource::None : EComfyApiKeySource::EditorPreferences;
+}
+
+bool UComfySubsystem::IsApiKeyRefused(const FComfyBackendProfile& Profile) const
+{
+	const FString* Refused = RefusedKeyHashes.Find(Profile.Name);
+	const FString Key = Refused ? ResolveApiKey(Profile) : FString();
+	return Refused && !Key.IsEmpty() && *Refused == FMD5::HashAnsiString(*Key);
+}
+
 TSharedPtr<IComfyBackend> UComfySubsystem::GetOrCreateBackend(const FComfyBackendProfile& Profile)
 {
 	const FString Key = ResolveApiKey(Profile);
-	// Comfy Cloud without a key runs through the signed-in Comfy Studio page.
-	const bool bViaPage = Profile.Kind == EComfyBackendKind::Cloud && Key.IsEmpty() && PageChannel.IsValid();
+	// Comfy Cloud without a usable key runs through the signed-in Comfy Studio page.
+	const bool bViaPage = Profile.Kind == EComfyBackendKind::Cloud && (Key.IsEmpty() || IsApiKeyRefused(Profile)) && PageChannel.IsValid();
 	const FString Fingerprint = FString::Printf(TEXT("%d|%s|%d|%d|%s|%d"), int32(Profile.Kind), *Profile.BaseUrl, int32(Profile.LocalProtocol), Profile.bSendPartnerNodeKey ? 1 : 0, *FMD5::HashAnsiString(*Key), bViaPage ? 1 : 0);
 	if (TSharedPtr<IComfyBackend>* Existing = BackendInstances.Find(Profile.Name))
 	{
@@ -221,6 +249,19 @@ void UComfySubsystem::ProbeBackend(FName Backend, FComfyBackendStatusDelegate On
 		FComfyBackendStatus Status = Raw;
 		if (UComfySubsystem* This = WeakThis.Get())
 		{
+			FComfyBackendProfile Checked;
+			if (Raw.bApiKeyRefused && This->GetBackendProfile(Raw.Backend, Checked) && !This->IsApiKeyRefused(Checked))
+			{
+				// Remember the refusal, so this key isn't used again; a different key is.
+				This->RefusedKeyHashes.Add(Raw.Backend, FMD5::HashAnsiString(*This->ResolveApiKey(Checked)));
+				This->RefusedKeyDetails.Add(Raw.Backend, Raw.Summary);
+				if (Checked.Kind == EComfyBackendKind::Cloud && This->PageChannel.IsValid())
+				{
+					// Comfy Cloud can still run with the sign-in: check it that way instead.
+					This->ProbeBackend(Raw.Backend, OnStatus);
+					return;
+				}
+			}
 			This->Statuses.Add(Raw.Backend, Raw);
 			Status = This->Decorate(Raw);
 			This->OnBackendStatus.Broadcast(Status);
@@ -300,7 +341,13 @@ FComfyBackendStatus UComfySubsystem::Decorate(const FComfyBackendStatus& Raw) co
 		return Raw;
 	}
 	FComfyBackendStatus Status = Raw;
-	if (!ResolveApiKey(Profile).IsEmpty())
+	Status.KeySource = GetApiKeySource(Profile, Status.KeySourceName);
+	Status.bApiKeyRefused = IsApiKeyRefused(Profile);
+	if (Status.bApiKeyRefused)
+	{
+		Status.Detail = RefusedKeyDetails.FindRef(Profile.Name);
+	}
+	else if (!ResolveApiKey(Profile).IsEmpty())
 	{
 		// The key does the work; the signed-in page, if any, still knows the free runs and credits.
 		if (CloudAccount.bSignedIn)
@@ -313,7 +360,16 @@ FComfyBackendStatus UComfySubsystem::Decorate(const FComfyBackendStatus& Raw) co
 	{
 		Status.bReachable = false;
 		Status.bNeedsSignIn = true;
-		Status.Summary = TEXT("Not signed in. Sign in to Comfy Cloud, or add an API key in Editor Preferences > Plugins > Comfy.");
+		if (Status.bApiKeyRefused)
+		{
+			const FString From = Status.KeySource == EComfyApiKeySource::Environment ? FString::Printf(TEXT("the %s environment variable"), *Status.KeySourceName)
+				: Status.KeySource == EComfyApiKeySource::Session ? FString(TEXT("this session")) : FString(TEXT("Editor Preferences"));
+			Status.Summary = FString::Printf(TEXT("Comfy Cloud refused the API key from %s. Sign in to Comfy Cloud instead, or replace the key."), *From);
+		}
+		else
+		{
+			Status.Summary = TEXT("Not signed in. Sign in to Comfy Cloud, or add an API key in Editor Preferences > Plugins > Comfy.");
+		}
 		return Status;
 	}
 	Status.bNeedsSignIn = false;
@@ -341,7 +397,7 @@ void UComfySubsystem::SetCloudAccount(const FComfyCloudAccount& Account)
 		// Signing in or out changes what a key-less Cloud backend can do: check it again, which also reads its models.
 		for (const FComfyBackendProfile& Profile : GetDefault<UComfySettings>()->Backends)
 		{
-			if (Profile.Kind == EComfyBackendKind::Cloud && ResolveApiKey(Profile).IsEmpty())
+			if (Profile.Kind == EComfyBackendKind::Cloud && (ResolveApiKey(Profile).IsEmpty() || IsApiKeyRefused(Profile)))
 			{
 				ProbeBackend(Profile.Name, FComfyBackendStatusDelegate());
 			}
