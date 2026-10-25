@@ -9,7 +9,7 @@
 // It only uses the frontend's public API object (window.comfyAPI.api.api) and reads the account stores.
 (() => {
   'use strict';
-  const VERSION = 2;
+  const VERSION = 4;
   if (window.__comfyUnreal && window.__comfyUnreal.version === VERSION) {
     window.__comfyUnreal.reportAccount(true);
     return;
@@ -95,12 +95,11 @@
     }
 
     const shapes = {};
-    let features = {};
     try {
       const response = await comfy.fetchApi('/features');
       shapes.features = response.status;
       if (response.ok) {
-        features = (await response.json()) || {};
+        const features = (await response.json()) || {};
         const free = features.free_tier_balance;
         if (free) {
           account.freeRunsRemaining = Number(free.remaining ?? 0);
@@ -109,46 +108,32 @@
       }
     } catch (e) { shapes.features = describe(e); }
 
-    // Which balance Comfy Cloud itself shows, as its billing routing decides: a personal workspace
-    // still on the older Stripe billing uses the account's own balance; everything else uses the
-    // workspace's. Unknown (no workspace yet) tries the account's first.
-    const rail = workspaces && workspaces.activeWorkspaceBillingRail;
-    const migrated = !!features.legacy_billing_migration_enabled;
-    const route = !active || !active.type ? 'unknown'
-      : active.type === 'personal' && rail === 'legacy_stripe' && !migrated ? 'legacy' : 'workspace';
-    shapes.route = `${route} (${active && active.type || '-'}, ${rail || '-'})`;
-    const balanceMicros = (balance) => {
-      const value = balance && (balance.effective_balance_micros ?? balance.amount_micros);
+    // The workspace's balance, then the account's (older billing). Both are in US cents: despite its
+    // name, *_micros carries the same cents value, so the *_cents fields are read first.
+    const balanceCents = (balance) => {
+      if (!balance) return undefined;
+      const value = balance.effective_balance_cents ?? balance.amount_cents ?? balance.effective_balance_micros ?? balance.amount_micros;
       return typeof value === 'number' ? value : undefined;
     };
-    const readWorkspace = async () => {
+    let cents;
+    try {
+      const response = await comfy.fetchApi('/billing/balance');
+      shapes.billing = response.status;
+      if (response.ok) cents = balanceCents(await response.json());
+    } catch (e) { shapes.billing = describe(e); }
+    if (cents === undefined && typeof auth.fetchBalance === 'function') {
       try {
-        const response = await comfy.fetchApi('/billing/balance');
-        shapes.billing = response.status;
-        if (response.ok) return balanceMicros(await response.json());
-      } catch (e) { shapes.billing = describe(e); }
-      return undefined;
-    };
-    const readAccountBalance = async () => {
-      if (typeof auth.fetchBalance !== 'function') return undefined;
-      try {
-        const balance = await auth.fetchBalance();
-        shapes.customer = balance ? 'ok' : 'none';
-        return balanceMicros(balance);
+        cents = balanceCents(await auth.fetchBalance());
+        shapes.customer = cents === undefined ? 'none' : 'ok';
       } catch (e) { shapes.customer = describe(e); }
-      return undefined;
-    };
-    let micros = route === 'workspace' ? await readWorkspace() : await readAccountBalance();
-    if (micros === undefined) {
-      micros = route === 'workspace' ? await readAccountBalance() : await readWorkspace();
     }
-    if (typeof micros === 'number') {
-      // Comfy credits: 211 per US dollar; balances are in millionths of a dollar.
-      account.credits = Math.floor((micros / 1e6) * 211);
+    if (cents !== undefined) {
+      // Comfy credits: 211 per US dollar, rounded as Comfy Cloud shows them.
+      account.credits = Math.round((cents / 100) * 211);
     }
     if (!loggedShapes) {
       loggedShapes = true;
-      log(`account read: route ${shapes.route}, features ${shapes.features}, billing ${shapes.billing ?? '-'}, customer ${shapes.customer ?? '-'}, free runs ${account.freeRunsRemaining ?? '-'}/${account.freeRunsAllowance ?? '-'}, credits ${account.credits ?? '-'}`);
+      log(`account read: features ${shapes.features}, billing ${shapes.billing ?? '-'}, customer ${shapes.customer ?? '-'}, free runs ${account.freeRunsRemaining ?? '-'}/${account.freeRunsAllowance ?? '-'}, credits ${account.credits ?? '-'}`);
     }
     return account;
   }
