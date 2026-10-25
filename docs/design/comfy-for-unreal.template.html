@@ -190,7 +190,7 @@ svg.diagram{width:100%;height:auto;display:block}
     <div class="brand"><img src="{{img:comfy-icon.png}}" alt=""><span class="kicker">Living design document</span></div>
     <h1>Comfy for Unreal</h1>
     <p class="tagline">ComfyUI inside the Unreal Editor. Workflows in, game-ready assets out.</p>
-    <p class="meta">Version 0.3 · 2026-10-25 · Comfy Org DevRel · Status: preparing an internal alpha, built for UE 5.8</p>
+    <p class="meta">Version 0.3.1 · 2026-10-25 · Comfy Org DevRel · Status: preparing an internal alpha, built for UE 5.8</p>
     <p class="truth">This is the source of truth for the product's experience and design. It extends the earlier proposal page and <code>docs/SPEC.md</code>, and the <a href="#changelog" style="color:#31b9f4">changelog</a> records each revision.</p>
   </div>
 </header>
@@ -433,7 +433,7 @@ svg.diagram{width:100%;height:auto;display:block}
       <li><b>Send to Unreal.</b> The action bar button opens a dialog: name, type, description, group and a thumbnail from the last result. The workflow is saved on the ComfyUI server and, inside Studio, lands as a Comfy Workflow asset in <code>/Game/Comfy/Workflows</code>.</li>
       <li><b>Share it.</b> The asset goes into source control with the project. Teammates connected to the same ComfyUI also see it under <b>Server</b> in the picker.</li>
     </ol>
-    <div class="today">Today: Graph view and Send to Unreal are built and tested; Jones sent a 18-input texture workflow and ran it. The extension (tagging, dialog, sidebar, library) is built but not yet tried in a browser: it loads on the next ComfyUI restart.</div>
+    <div class="today">Today: Graph view and Send to Unreal are built and tested; Jones sent a 18-input texture workflow and ran it. The extension (tagging, dialog, sidebar, library) is built but has never loaded: it was only linked into an unused portable ComfyUI, and Comfy Cloud can't load it. It's now linked into Comfy Desktop's install and loads on the next restart there. See <a href="#ext-install">Installing the extension</a>.</div>
   </div>
 
   <figure>
@@ -584,6 +584,17 @@ svg.diagram{width:100%;height:auto;display:block}
     </div>
   </div>
 
+  <h3 id="ext-install">Installing the extension</h3>
+  <p>The extension is a folder in ComfyUI's <code>custom_nodes</code>. ComfyUI reads that folder only at startup, and only on a ComfyUI that loads custom nodes.</p>
+  <div class="tbl"><table>
+    <thead><tr><th>Where</th><th>State</th><th>What it takes</th></tr></thead>
+    <tbody>
+      <tr><td class="k">Our PC, Comfy Desktop</td><td><span class="chip partial">linked, not loaded</span></td><td>Linked October 25 into <code>&lt;install path&gt;\ComfyUI\custom_nodes</code>; the install path comes from Comfy Desktop's <code>installations.json</code>. Before that, the only link was in a portable ComfyUI that hadn't run since, so the extension never loaded anywhere. It loads when the local ComfyUI restarts in Comfy Desktop. Check: <code>GET /comfy_unreal/status</code> answers, the startup log lists <code>comfy-for-unreal</code> under "Import times", and <b>Send to Unreal</b> and the <b>Unreal</b> sidebar tab appear.</td></tr>
+      <tr><td class="k">Testers, Comfy Desktop or a local ComfyUI</td><td><span class="chip todo">proposed</span></td><td>Ship the extension inside the plugin (<code>Resources/ComfyExtension</code>, keeping its GPL-3.0 license as a separate work). A Studio action, <b>Install ComfyUI extension</b>, reads <code>installations.json</code>, copies the folder into that install's <code>custom_nodes</code>, and asks the user to restart ComfyUI. Studio shows it as loaded once <code>/comfy_unreal/status</code> answers. About a day. The Comfy Registry or a ComfyUI Manager git URL comes later; both need a public repository.</td></tr>
+      <tr><td class="k">Comfy Cloud</td><td><span class="chip todo">proposed</span></td><td>Cloud loads no custom nodes, by design, so the extension can't be installed there. Studio already injects a bridge script into the Cloud page; it would also inject the extension's frontend, bundled into one script that uses the page's <code>window.comfyAPI</code> instead of ES imports. <b>Send to Unreal</b> would go straight to Unreal, and the library, which has no server routes on Cloud, would live on the Unreal side or in Cloud's user data. One to two days. This is alpha item 5.</td></tr>
+    </tbody>
+  </table></div>
+
   <h3 id="remix">How it mirrors RTX Remix 1.6</h3>
   <div class="tbl"><table>
     <thead><tr><th>RTX Remix</th><th>Comfy for Unreal</th></tr></thead>
@@ -605,7 +616,7 @@ svg.diagram{width:100%;height:auto;display:block}
 <section class="doc" id="workflows">
   <div class="sec-num">07</div>
   <h2>Workflows and the manifest</h2>
-  <p class="lede">A Comfy Workflow asset is the API graph plus a manifest. The manifest drives the form, the Blueprint node and the agent schema.</p>
+  <p class="lede">A Comfy Workflow asset is the API graph plus a manifest. The manifest drives the Studio form and the agent schema. Blueprint takes the same input names, as a map of strings (see <a href="#bp-gaps">section 9</a>).</p>
   <p>The manifest lives in <code>workflow.extra.comfy_unreal</code> and is specified in <code>docs/MANIFEST.md</code> in both repositories. Precedence when a graph comes in: the manifest, then ComfyUI App mode's chosen inputs (<code>extra.linearData</code>), then the plugin's own detection.</p>
   <div class="tbl"><table>
     <thead><tr><th>Output kind and slot</th><th>Becomes</th><th>Import settings</th></tr></thead>
@@ -707,10 +718,35 @@ svg.diagram{width:100%;height:auto;display:block}
   <h2>Blueprint, Python and agents</h2>
   <p class="lede">Studio is one client of a public API. Everything it does, a script or an agent can do.</p>
   <ul>
-    <li><b>Blueprint:</b> the async node <i>Run Comfy Workflow</i> with On Progress, On Completed and On Failed pins; <i>Load Texture From Job</i> and <i>Load Sound From Job</i> for runtime use.</li>
+    <li><b>Blueprint:</b> the async node <i>Run Comfy Workflow</i> with On Progress, On Completed and On Failed pins; <i>Load Texture From Job</i> and <i>Load Sound From Job</i> for runtime use. Details below.</li>
     <li><b>Python:</b> <code>unreal.get_engine_subsystem(unreal.ComfySubsystem)</code> and <code>unreal.ComfyEditorLibrary</code>, reflected automatically.</li>
     <li><b>Agents:</b> 18 tools in <code>ComfyAgent.ComfyToolset</code>, including <code>ListWorkflows</code>, <code>DescribeWorkflow</code> (inputs as JSON Schema, model choices as enums), <code>RunWorkflow</code>, <code>WaitForJob</code>, <code>GenerateMaterial</code> and <code>OpenStudio</code>. Results are compact JSON.</li>
   </ul>
+
+  <h3 id="blueprint">Blueprint</h3>
+  <p>Every node is a plain <code>UFUNCTION</code> on the subsystem, the job, the workflow or a function library. There's no custom K2 node.</p>
+  <div class="tbl"><table>
+    <thead><tr><th>Step</th><th>Nodes</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td class="k">1. Pick a workflow</td><td>A Comfy Workflow asset reference; <i>Get Built In Workflows</i>; <i>Find Workflow</i> (editor); <i>Create Transient From Json</i></td><td>Assets come from importing an <code>Export (API)</code> JSON or from <b>Send to Unreal</b>. Built-ins are the six starters, loaded as transient assets.</td></tr>
+      <tr><td class="k">2. Run it</td><td><i>Run Comfy Workflow</i> (async): Workflow, Inputs, Backend. Pins: On Progress (repeats), On Completed, On Failed (once each), each passing the Comfy Job.</td><td>Inputs is a <code>Map&lt;String, String&gt;</code> keyed by manifest input name (<code>prompt</code>, <code>seed</code>). Inputs left out keep the graph's value; File inputs take an absolute path. Backend None uses the active backend. On Completed fires after every output has downloaded. Also: <i>Run Comfy Router Model</i> (same pins, spends credits), and <i>Run Workflow</i> on the subsystem, which returns the job with bindable On Completed and On Failed events.</td></tr>
+      <tr><td class="k">3a. Use it in game</td><td><i>Load Texture From Job</i>, <i>Load Sound From Job</i>, <i>Load Texture From File</i>, <i>Load Sound From File</i>, <i>Make Tileable</i>, <i>Make Normal Map</i>, <i>New Comfy Seed</i></td><td><code>Comfy|Runtime</code>, no editor needed. Textures and sounds are transient. Empty output name takes the first of its kind; sRGB off for normal maps.</td></tr>
+      <tr><td class="k">3b. Read the job</td><td><i>Get Output</i>, <i>Get Outputs Of Kind</i>, <i>Get Output Directory</i>, <i>Succeeded</i>, <i>Get State Text</i>, <i>Cancel</i></td><td></td></tr>
+      <tr><td class="k">3c. Use it in the editor</td><td><i>Import Job Outputs</i>, <i>Create Material From Job</i>, <i>Assign Material To Selected Actors</i>, <i>Export Asset For Input</i>, <i>Capture Active Viewport</i>, <i>Get Provenance</i>, <i>Open Studio</i></td><td><code>Comfy|Editor</code>, for Editor Utility Blueprints. Imported assets record the job that made them; assigning a material can be undone.</td></tr>
+      <tr><td class="k">Backends</td><td><i>Get</i>/<i>Set Active Backend</i>, <i>Probe Backend</i>, <i>Get Last Status</i>, <i>Get Input Options</i>, <i>Get Missing Models</i>, <i>Get Missing Node Classes</i>, <i>Spends Credits</i>, <i>Get Cloud Account</i>, <i>Set Session Api Key</i></td><td>Check a workflow against a backend before running it. For a shipped game, a key belongs on the game's own server, not in the client.</td></tr>
+    </tbody>
+  </table></div>
+  <p>A typical graph: <code>Event → Run Comfy Workflow (Seamless Texture, {prompt: "mossy cobblestone"}) → On Completed → Load Texture From Job → Set Texture Parameter Value</code> on a dynamic material instance.</p>
+
+  <h3 id="bp-gaps">Blueprint gaps</h3>
+  <div class="tbl"><table>
+    <thead><tr><th>Gap</th><th>Effect</th><th>State</th></tr></thead>
+    <tbody>
+      <tr><td class="k">Inputs aren't typed pins</td><td>A misspelled key is ignored without a warning, every value is a string, and the node looks the same whichever workflow it runs. The README and this doc said the manifest "drives the Blueprint node"; it doesn't.</td><td><span class="chip todo">to decide</span> Options: a custom K2 node with one typed pin per manifest input; or a warning, at run time or compile time, for keys the manifest doesn't have.</td></tr>
+      <tr><td class="k">In-game sound needs 16-bit PCM WAV</td><td>The Sound Effect and Music Track starters save with ComfyUI's <i>SaveAudio</i>, which writes FLAC, so <i>Load Sound From Job</i> likely fails on their results in game. Importing in the editor works.</td><td><span class="chip todo">to check</span> Options: a WAV save node in the starters, or FLAC decoding in the runtime loader.</td></tr>
+      <tr><td class="k">Not run end to end</td><td>No Blueprint node has been exercised in this round of work.</td><td><span class="chip todo">to test</span></td></tr>
+    </tbody>
+  </table></div>
 </section>
 
 <!-- ============================================================ 10 -->
@@ -795,7 +831,7 @@ svg.diagram{width:100%;height:auto;display:block}
     <thead><tr><th>#</th><th>Work</th><th>State</th><th>Notes</th></tr></thead>
     <tbody>
       <tr><td class="k">5</td><td><b>Save from the Cloud page into the project.</b> Test <b>Send to Unreal</b> on Cloud first; the full version injects the extension's tagging into the Cloud page.</td><td><span class="chip todo">to test</span></td><td>See open question on the extension on Cloud.</td></tr>
-      <tr><td class="k">6</td><td><b>Load the extension in ComfyUI</b> and give testers an install route (a zip into <code>custom_nodes</code>, or the Comfy Registry).</td><td><span class="chip partial">built, not loaded</span></td><td>For workflow authors among the testers.</td></tr>
+      <tr><td class="k">6</td><td><b>Load the extension in ComfyUI</b> and give testers an install route (a zip into <code>custom_nodes</code>, or the Comfy Registry).</td><td><span class="chip partial">linked, not loaded</span></td><td>For workflow authors among the testers. It had never loaded: linked only into an unused portable install, and Cloud can't load it. Now linked into Comfy Desktop; the install route for testers is proposed in <a href="#ext-install">Installing the extension</a>.</td></tr>
       <tr><td class="k">7</td><td><b>Cost before Run</b> on Cloud, and partner-node runs flagged.</td><td><span class="chip todo">to build</span></td><td>Missing-model check is done.</td></tr>
       <tr><td class="k">8</td><td><b>Polish:</b> a friendlier Graph page when ComfyUI is stopped; the API key walkthrough in Settings.</td><td><span class="chip todo">to build</span></td><td></td></tr>
       <tr><td class="k">9</td><td><b>Screenshots</b> for the README (5) and the get-started page (7), plus a new library shot for this doc.</td><td><span class="chip todo">to take</span></td><td>Spots and file names are marked in both files.</td></tr>
@@ -810,6 +846,7 @@ svg.diagram{width:100%;height:auto;display:block}
     <li>Thumbnails in the workflow picker, sliders with ranges, one run per selected asset.</li>
     <li>Run history shared across a team.</li>
     <li>Agent toolset polish: presets and missing-model info in the tool schema.</li>
+    <li>Blueprint: typed input pins and in-game loading of the audio starters' output (see <a href="#bp-gaps">Blueprint gaps</a>).</li>
     <li>macOS and Linux, Fab and ComfyUI Manager listings.</li>
   </ul>
 
@@ -857,6 +894,7 @@ svg.diagram{width:100%;height:auto;display:block}
     <li><b>Run history.</b> Kept per user in <code>Saved/</code>. Should a team be able to share it, for example by saving runs beside the workflow asset?</li>
     <li><b>Texture model.</b> FLUX.2 Klein 4B replaces the proven Flux Schnell graph: smaller for Desktop (11.6 GB against 17 GB) and one family for create and restyle. Is its texture quality as good? The first runs decide.</li>
     <li><b>Mesh license.</b> Hunyuan3D 2.0's license excludes the EU, UK and South Korea. Fine for an internal alpha; for the public release, switch to TRELLIS.2 (MIT) or ship the mesh template without a default model?</li>
+    <li><b>Blueprint inputs.</b> Typed pins per workflow (a custom K2 node), or keep the string map and warn on unknown keys? And should the audio starters save WAV so they load in game? See <a href="#bp-gaps">Blueprint gaps</a>.</li>
     <li><b>Upstream templates.</b> Would Comfy-Org take a "Game assets" category in the official templates, so Cloud users get these starters natively?</li>
   </ol>
 </section>
@@ -898,6 +936,7 @@ svg.diagram{width:100%;height:auto;display:block}
   <div class="tbl"><table>
     <thead><tr><th>Version</th><th>Date</th><th>Changes</th></tr></thead>
     <tbody>
+      <tr><td>0.3.1</td><td>2026-10-25</td><td>Why the extension never loaded, and how it gets installed on Desktop, for testers and on Cloud. Blueprint walkthrough and gaps; corrected the claim that the manifest drives the Blueprint node.</td></tr>
       <tr><td>0.3</td><td>2026-10-25</td><td>Six starter workflows replace the built-ins, with presets, a missing-model message and download, and Play and Open mesh previews. New section: Path to alpha, with the must-have, should-have and later work and the decisions needed. Roadmap, open questions and decision log updated. Get-started page and README drafted.</td></tr>
       <tr><td>0.2</td><td>2026-10-25</td><td>Journey 1 built and tested: local detection, welcome card, Cloud sign-in through the page bridge, account and credits in the status line. UX review fixes: refused-key fallback, plainer errors, type, library cards, left column, disabled states. Project runs (run history). How the form comes from the workflow. Starter-template plan. New screenshots.</td></tr>
       <tr><td>0.1</td><td>2026-10-24</td><td>First version: product shape, seven UX journeys, Studio and extension specs, visual tokens, current state and open questions. Added Cloud sign-in findings and the page-bridge proposal after the first Cloud test.</td></tr>
