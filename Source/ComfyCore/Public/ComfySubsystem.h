@@ -35,6 +35,7 @@ class COMFYCORE_API UComfySubsystem : public UEngineSubsystem
 public:
 	static UComfySubsystem* Get();
 
+	virtual void Initialize(FSubsystemCollectionBase& Collection) override;
 	virtual void Deinitialize() override;
 
 	/**
@@ -205,6 +206,9 @@ private:
 	UPROPERTY(Transient)
 	TArray<TObjectPtr<UComfyWorkflow>> ServerWorkflows;
 	bool bBuiltInsLoaded = false;
+
+	/** Reads the project's earlier runs from Saved/Comfy/Jobs into Jobs, oldest first. */
+	void LoadJobHistory();
 
 	TMap<FName, TSharedPtr<IComfyBackend>> BackendInstances;
 	TMap<FName, FString> BackendFingerprints;

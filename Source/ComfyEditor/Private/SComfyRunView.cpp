@@ -137,13 +137,17 @@ void SComfyRunView::Construct(const FArguments& InArgs)
 							]
 						]
 					]
-					+ SVerticalBox::Slot().AutoHeight().Padding(12, 8, 12, 12)
+					+ SVerticalBox::Slot().AutoHeight().Padding(12, 8, 12, 0)
 					[
 						SNew(SBox)
 						.Visibility_Lambda([this]() { return SelectedWorkflow.IsValid() ? EVisibility::Visible : EVisibility::Collapsed; })
 						[
 							BuildRunBar()
 						]
+					]
+					+ SVerticalBox::Slot().AutoHeight().Padding(12, 8, 12, 12)
+					[
+						BuildRunsPicker()
 					]
 				]
 			]
@@ -336,6 +340,288 @@ TSharedRef<SWidget> SComfyRunView::BuildPickerMenu()
 				SNew(SScrollBox) + SScrollBox::Slot()[List]
 			]
 		];
+}
+
+namespace ComfyRunViewPrivate
+{
+	/** "just now", "12 min ago", "3 h ago", "2 days ago", then the date. */
+	static FText RelativeTime(const FDateTime& Utc)
+	{
+		const FTimespan Age = FDateTime::UtcNow() - Utc;
+		if (Utc.GetTicks() == 0)
+		{
+			return FText::GetEmpty();
+		}
+		if (Age.GetTotalMinutes() < 1.0)
+		{
+			return LOCTEXT("JustNow", "just now");
+		}
+		if (Age.GetTotalHours() < 1.0)
+		{
+			return FText::Format(LOCTEXT("MinutesAgo", "{0} min ago"), FText::AsNumber(FMath::FloorToInt(Age.GetTotalMinutes())));
+		}
+		if (Age.GetTotalDays() < 1.0)
+		{
+			return FText::Format(LOCTEXT("HoursAgo", "{0} h ago"), FText::AsNumber(FMath::FloorToInt(Age.GetTotalHours())));
+		}
+		if (Age.GetTotalDays() < 7.0)
+		{
+			const int32 Days = FMath::FloorToInt(Age.GetTotalDays());
+			return Days == 1 ? LOCTEXT("Yesterday", "yesterday") : FText::Format(LOCTEXT("DaysAgo", "{0} days ago"), FText::AsNumber(Days));
+		}
+		return FText::AsDate(Utc, EDateTimeStyle::Medium);
+	}
+
+	/** When a run happened: when it finished, or started for one still going. */
+	static FDateTime RunTime(const UComfyJob* Job)
+	{
+		return Job->FinishedAt.GetTicks() > 0 ? Job->FinishedAt : Job->CreatedAt;
+	}
+}
+
+TSharedRef<SWidget> SComfyRunView::BuildRunsPicker()
+{
+	return SNew(SComboButton)
+		.ButtonStyle(&Style(), "Comfy.Button")
+		.HasDownArrow(true)
+		.MenuPlacement(MenuPlacement_AboveAnchor)
+		.ToolTipText(LOCTEXT("RunsTooltip", "This project's runs, kept in Saved/Comfy/Jobs. Open one to see its result and run it again."))
+		.Visibility_Lambda([]()
+		{
+			const UComfySubsystem* Comfy = UComfySubsystem::Get();
+			return Comfy && Comfy->GetJobs().Num() > 0 ? EVisibility::Visible : EVisibility::Collapsed;
+		})
+		.OnGetMenuContent(this, &SComfyRunView::BuildRunsMenu)
+		.ButtonContent()
+		[
+			SNew(SVerticalBox)
+			+ SVerticalBox::Slot().AutoHeight()
+			[
+				SNew(STextBlock).TextStyle(&Style(), "Comfy.Text.Title").Text(LOCTEXT("ProjectRuns", "Project runs"))
+			]
+			+ SVerticalBox::Slot().AutoHeight()
+			[
+				SNew(STextBlock)
+				.TextStyle(&Style(), "Comfy.Text.Muted")
+				.OverflowPolicy(ETextOverflowPolicy::Ellipsis)
+				.Text_Lambda([]()
+				{
+					const UComfySubsystem* Comfy = UComfySubsystem::Get();
+					const TArray<UComfyJob*> Jobs = Comfy ? Comfy->GetJobs() : TArray<UComfyJob*>();
+					if (Jobs.Num() == 0 || !Jobs.Last())
+					{
+						return FText::GetEmpty();
+					}
+					return FText::Format(LOCTEXT("RunsSummary", "{0} {0}|plural(one=run,other=runs)  ·  last {1}"), FText::AsNumber(Jobs.Num()), RelativeTime(RunTime(Jobs.Last())));
+				})
+			]
+		];
+}
+
+TSharedRef<SWidget> SComfyRunView::BuildRunsMenu()
+{
+	// Newest first. The menu is rebuilt each time it opens, so it's always current.
+	static constexpr int32 MaxShown = 50;
+	TSharedRef<SVerticalBox> List = SNew(SVerticalBox);
+	const UComfySubsystem* Comfy = UComfySubsystem::Get();
+	const TArray<UComfyJob*> Jobs = Comfy ? Comfy->GetJobs() : TArray<UComfyJob*>();
+	List->AddSlot().AutoHeight().Padding(10, 10, 10, 4)
+	[
+		SNew(STextBlock).TextStyle(&Style(), "Comfy.Text.Label").Text(LOCTEXT("ProjectRunsHeader", "PROJECT RUNS"))
+	];
+	for (int32 Index = Jobs.Num() - 1; Index >= 0 && Jobs.Num() - Index <= MaxShown; --Index)
+	{
+		UComfyJob* Job = Jobs[Index];
+		if (!Job)
+		{
+			continue;
+		}
+		const TWeakObjectPtr<UComfyJob> WeakJob = Job;
+		// The inputs it ran with, for the tooltip.
+		FString Tooltip = Job->Title;
+		for (const TPair<FString, FString>& Pair : Job->Inputs)
+		{
+			if (!Pair.Value.IsEmpty())
+			{
+				Tooltip += FString::Printf(TEXT("\n%s: %s"), *FName::NameToDisplayString(Pair.Key, false), *(Pair.Value.Len() > 80 ? Pair.Value.Left(77) + TEXT("...") : Pair.Value));
+			}
+		}
+		if (!Job->ErrorMessage.IsEmpty())
+		{
+			Tooltip += TEXT("\n\n") + Job->ErrorMessage;
+		}
+		List->AddSlot().AutoHeight().Padding(4, 1)
+		[
+			SNew(SButton)
+			.ButtonStyle(&Style(), "Comfy.Button.Ghost")
+			.ContentPadding(FMargin(6, 4))
+			.ToolTipText(FText::FromString(Tooltip))
+			.OnClicked_Lambda([this, WeakJob]()
+			{
+				OpenRun(WeakJob.Get());
+				FSlateApplication::Get().DismissAllMenus();
+				return FReply::Handled();
+			})
+			[
+				SNew(SHorizontalBox)
+				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0, 0, 10, 0)
+				[
+					SNew(SBorder)
+					.BorderImage(Style().GetBrush("Comfy.Card"))
+					.Padding(0)
+					[
+						SNew(SBox).WidthOverride(40.f).HeightOverride(40.f)
+						[
+							SNew(SOverlay)
+							+ SOverlay::Slot()
+							[
+								SNew(SScaleBox).Stretch(EStretch::ScaleToFill)
+								[
+									SNew(SImage).Image_Lambda([this, WeakJob]() { return GetJobBrush(WeakJob.Get()); })
+								]
+							]
+							+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Center)
+							[
+								SNew(STextBlock)
+								.TextStyle(&Style(), "Comfy.Text.Label")
+								.Visibility_Lambda([this, WeakJob]() { return GetJobBrush(WeakJob.Get()) ? EVisibility::Collapsed : EVisibility::HitTestInvisible; })
+								.Text_Lambda([WeakJob]()
+								{
+									const UComfyJob* Shown = WeakJob.Get();
+									if (!Shown || !Shown->Succeeded() || Shown->Outputs.Num() == 0)
+									{
+										return FText::GetEmpty();
+									}
+									return FText::FromString(StaticEnum<EComfyOutputKind>()->GetNameStringByValue(int64(Shown->Outputs[0].Kind)).Left(5).ToUpper());
+								})
+							]
+						]
+					]
+				]
+				+ SHorizontalBox::Slot().FillWidth(1.f).VAlign(VAlign_Center)
+				[
+					SNew(SVerticalBox)
+					+ SVerticalBox::Slot().AutoHeight()
+					[
+						SNew(STextBlock).TextStyle(&Style(), "Comfy.Text").OverflowPolicy(ETextOverflowPolicy::Ellipsis).Text(FText::FromString(Job->Title))
+					]
+					+ SVerticalBox::Slot().AutoHeight()
+					[
+						SNew(STextBlock)
+						.TextStyle(&Style(), "Comfy.Text.Muted")
+						.OverflowPolicy(ETextOverflowPolicy::Ellipsis)
+						.ColorAndOpacity_Lambda([WeakJob]()
+						{
+							const UComfyJob* Shown = WeakJob.Get();
+							const bool bFailed = Shown && Shown->IsFinished() && !Shown->Succeeded();
+							return FSlateColor(bFailed ? FComfyEditorStyle::FPalette::Danger : FComfyEditorStyle::FPalette::TextMuted);
+						})
+						.Text_Lambda([WeakJob]()
+						{
+							const UComfyJob* Shown = WeakJob.Get();
+							if (!Shown)
+							{
+								return FText::GetEmpty();
+							}
+							if (!Shown->IsFinished())
+							{
+								return Shown->Progress.Fraction >= 0.f
+									? FText::Format(LOCTEXT("RunRunning", "{0}  ·  {1}"), FText::FromString(Shown->GetStateText()), FText::AsPercent(Shown->Progress.Fraction))
+									: FText::FromString(Shown->GetStateText());
+							}
+							const FText When = RelativeTime(RunTime(Shown));
+							return Shown->Succeeded() ? When : FText::Format(LOCTEXT("RunEnded", "{0}  ·  {1}"), When, FText::FromString(Shown->GetStateText()));
+						})
+					]
+				]
+			]
+		];
+	}
+	if (Jobs.Num() > MaxShown)
+	{
+		List->AddSlot().AutoHeight().Padding(10, 6, 10, 8)
+		[
+			SNew(STextBlock).TextStyle(&Style(), "Comfy.Text.Muted")
+			.Text(FText::Format(LOCTEXT("OlderRuns", "{0} older runs are in Saved/Comfy/Jobs."), FText::AsNumber(Jobs.Num() - MaxShown)))
+		];
+	}
+	return SNew(SBorder)
+		.BorderImage(Style().GetBrush("Comfy.Panel"))
+		.Padding(4)
+		[
+			SNew(SBox).WidthOverride(340.f).MaxDesiredHeight(480.f)
+			[
+				SNew(SScrollBox) + SScrollBox::Slot()[List]
+			]
+		];
+}
+
+UComfyWorkflow* SComfyRunView::FindWorkflowFor(const UComfyJob* Job) const
+{
+	if (!Job)
+	{
+		return nullptr;
+	}
+	if (Job->Workflow && Workflows.Contains(Job->Workflow.Get()))
+	{
+		return Job->Workflow;
+	}
+	// A run from the project's history: by asset path, then source file, then name.
+	for (const TWeakObjectPtr<UComfyWorkflow>& Weak : Workflows)
+	{
+		const UComfyWorkflow* Workflow = Weak.Get();
+		if (Workflow && !Job->WorkflowPath.IsEmpty() && !Workflow->HasAnyFlags(RF_Transient) && Workflow->GetPathName() == Job->WorkflowPath)
+		{
+			return Weak.Get();
+		}
+	}
+	for (const TWeakObjectPtr<UComfyWorkflow>& Weak : Workflows)
+	{
+		const UComfyWorkflow* Workflow = Weak.Get();
+		if (Workflow && !Job->WorkflowSource.IsEmpty() && Workflow->SourceFile == Job->WorkflowSource)
+		{
+			return Weak.Get();
+		}
+	}
+	for (const TWeakObjectPtr<UComfyWorkflow>& Weak : Workflows)
+	{
+		const UComfyWorkflow* Workflow = Weak.Get();
+		if (Workflow && !Job->WorkflowName.IsEmpty() && Workflow->GetDisplayNameString() == Job->WorkflowName)
+		{
+			return Weak.Get();
+		}
+	}
+	return nullptr;
+}
+
+void SComfyRunView::OpenRun(UComfyJob* Job)
+{
+	if (!Job)
+	{
+		return;
+	}
+	if (UComfyWorkflow* Workflow = FindWorkflowFor(Job))
+	{
+		SelectWorkflow(Workflow);
+		// Back to what it ran with, so it can run again as is or with a change. Seeds stay as set:
+		// a random one still gives a new result, and a fixed one is kept.
+		for (const FComfyWorkflowInput& Input : Workflow->Inputs)
+		{
+			const FString* Value = Job->Inputs.Find(Input.Name);
+			if (!Value || Value->IsEmpty() || Input.Type == EComfyInputType::Seed)
+			{
+				continue;
+			}
+			if (Input.Type == EComfyInputType::File && !FPaths::FileExists(*Value))
+			{
+				continue;
+			}
+			InputValues.Add(Input.Name, *Value);
+		}
+		RebuildForm();
+	}
+	SelectJob(Job);
+	MainSwitcher->SetActiveWidgetIndex(1);
 }
 
 TSharedPtr<SWidget> SComfyRunView::MakeWelcomeCard() const

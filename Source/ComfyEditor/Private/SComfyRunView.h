@@ -47,6 +47,14 @@ private:
 	// Left column
 	TSharedRef<SWidget> BuildPicker();
 	TSharedRef<SWidget> BuildPickerMenu();
+
+	// Project runs: this project's earlier runs, newest first, at the bottom of the left column.
+	TSharedRef<SWidget> BuildRunsPicker();
+	TSharedRef<SWidget> BuildRunsMenu();
+	/** Shows a run's result and puts its workflow and inputs back in the form. */
+	void OpenRun(UComfyJob* Job);
+	/** The workflow a run used, when it's still in the library. */
+	UComfyWorkflow* FindWorkflowFor(const UComfyJob* Job) const;
 	TSharedRef<SWidget> BuildOptionsCard();
 	TSharedRef<SWidget> BuildRunBar();
 	void SelectWorkflow(UComfyWorkflow* Workflow);

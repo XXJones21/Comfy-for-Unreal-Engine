@@ -30,6 +30,38 @@ UComfySubsystem* UComfySubsystem::Get()
 	return GEngine ? GEngine->GetEngineSubsystem<UComfySubsystem>() : nullptr;
 }
 
+void UComfySubsystem::Initialize(FSubsystemCollectionBase& Collection)
+{
+	Super::Initialize(Collection);
+	LoadJobHistory();
+}
+
+void UComfySubsystem::LoadJobHistory()
+{
+	// The newest runs only: enough to browse, without loading a long project's whole history.
+	static constexpr int32 MaxHistory = 200;
+	const FString JobsDir = FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir() / TEXT("Comfy") / TEXT("Jobs"));
+	TArray<FString> Folders;
+	IFileManager::Get().FindFiles(Folders, *(JobsDir / TEXT("*")), false, true);
+	// Job ids start with their start time, so names sort by age.
+	Folders.Sort();
+	if (Folders.Num() > MaxHistory)
+	{
+		Folders.RemoveAt(0, Folders.Num() - MaxHistory);
+	}
+	TArray<TObjectPtr<UComfyJob>> History;
+	for (const FString& Folder : Folders)
+	{
+		if (UComfyJob* Job = UComfyJob::LoadRecord(this, JobsDir / Folder))
+		{
+			History.Add(Job);
+		}
+	}
+	History.Append(Jobs);
+	Jobs = MoveTemp(History);
+	UE_LOG(LogComfy, Log, TEXT("Read %d earlier run(s) from %s."), Jobs.Num(), *JobsDir);
+}
+
 void UComfySubsystem::Deinitialize()
 {
 	for (UComfyJob* Job : Jobs)
@@ -546,6 +578,11 @@ UComfyJob* UComfySubsystem::NewJob(FName Backend, const FString& Title)
 	TWeakObjectPtr<UComfySubsystem> WeakThis = this;
 	Job->OnFinishedNative.AddLambda([WeakThis](UComfyJob* Finished)
 	{
+		if (Finished)
+		{
+			// Every run joins the project's history, kept beside its outputs.
+			Finished->SaveRecord();
+		}
 		if (Finished && Finished->BackendKind == EComfyBackendKind::Cloud && WeakThis.IsValid())
 		{
 			WeakThis->RefreshCloudAccount();

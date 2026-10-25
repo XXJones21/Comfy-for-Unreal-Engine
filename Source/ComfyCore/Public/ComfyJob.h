@@ -73,6 +73,23 @@ public:
 	UPROPERTY(BlueprintReadOnly, Category = "Comfy")
 	FDateTime FinishedAt;
 
+	/** True for a run read back from the project's history (Saved/Comfy/Jobs) rather than started this session. */
+	UPROPERTY(BlueprintReadOnly, Category = "Comfy")
+	bool bFromHistory = false;
+
+	/**
+	 * Which workflow ran, for finding it again: its asset path (project workflows), source file
+	 * (built-in and server workflows) and display name. Workflow itself is only set this session.
+	 */
+	UPROPERTY(BlueprintReadOnly, Category = "Comfy")
+	FString WorkflowPath;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Comfy")
+	FString WorkflowSource;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Comfy")
+	FString WorkflowName;
+
 	/** Fires on every state change. */
 	UPROPERTY(BlueprintAssignable, Category = "Comfy")
 	FComfyJobEvent OnStateChanged;
@@ -117,6 +134,15 @@ public:
 
 	/** The job as JSON: state, progress, outputs and error. Used by the agent toolset. */
 	FString ToJson() const;
+
+	/** Writes the finished job to job.json beside its outputs, so the project's runs survive a restart. */
+	void SaveRecord() const;
+
+	/**
+	 * A finished job read back from its folder under Saved/Comfy/Jobs. Folders from before job.json
+	 * existed come back as "Earlier run" with whatever outputs are there. Null when there's nothing to show.
+	 */
+	static UComfyJob* LoadRecord(UObject* Outer, const FString& Directory);
 
 	// Called by backends.
 	void SetState(EComfyJobState NewState);

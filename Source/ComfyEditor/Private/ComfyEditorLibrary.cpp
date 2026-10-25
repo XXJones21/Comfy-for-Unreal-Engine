@@ -81,7 +81,8 @@ namespace ComfyEditorPrivate
 	{
 		if (!Job->Workflow)
 		{
-			return Job->ModelId;
+			// A run from the project's history knows its workflow only by name.
+			return !Job->ModelId.IsEmpty() ? Job->ModelId : !Job->WorkflowPath.IsEmpty() ? Job->WorkflowPath : Job->WorkflowSource;
 		}
 		return Job->Workflow->HasAnyFlags(RF_Transient) ? Job->Workflow->SourceFile : Job->Workflow->GetPathName();
 	}
