@@ -1,0 +1,807 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Comfy for Unreal</title>
+<link rel="icon" href="{{img:comfy-icon.png}}">
+<style>
+:root{
+  --page:#f3f3f3; --panel:#ffffff; --card:#ffffff; --card2:#f3f3f3; --line:#e1e1e1; --border:#c5c5c5;
+  --ink:#171718; --muted:#5b5c62; --faint:#8a8a8a; --link:#0b8ce9; --accent:#0b8ce9;
+  --code-bg:#ececec; --ok:#1f9d55; --warn:#b7791f; --bad:#c53030; --hl:#fdffd6;
+  --shadow:0 10px 30px rgba(23,23,24,.10);
+  --r-lg:16px; --r-md:12px; --r-sm:8px;
+  --sans:"Inter",system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  --mono:ui-monospace,"SF Mono","Cascadia Mono",Menlo,Consolas,"Liberation Mono",monospace;
+  /* ComfyUI frontend 1.53 dark tokens, for mockups and the masthead. */
+  --c800:#171718; --c700:#202121; --c600:#262729; --c500:#2d2e32; --c400:#313235; --c300:#3c3d42; --c200:#494a50; --c100:#55565e;
+  --azure600:#0b8ce9; --azure400:#31b9f4; --smoke700:#a0a0a0; --electric:#f0ff41;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --page:#111112; --panel:#171718; --card:#202121; --card2:#262729; --line:#313235; --border:#494a50;
+    --ink:#f0efed; --muted:#a0a0a0; --faint:#6f7076; --link:#31b9f4; --accent:#31b9f4;
+    --code-bg:#262729; --ok:#33c46b; --warn:#f5a623; --bad:#ef6b6f; --hl:#2a2b16;
+    --shadow:0 10px 30px rgba(0,0,0,.5);
+  }
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;-webkit-text-size-adjust:100%}
+@media (prefers-reduced-motion: reduce){html{scroll-behavior:auto}}
+body{margin:0;background:var(--page);color:var(--ink);font:16px/1.6 var(--sans);-webkit-font-smoothing:antialiased;overflow-x:hidden}
+a{color:var(--link);text-underline-offset:2px}
+code{font-family:var(--mono);font-size:.86em;background:var(--code-bg);border:1px solid var(--line);border-radius:5px;padding:.05em .35em;overflow-wrap:anywhere}
+pre{font-family:var(--mono);font-size:13px;line-height:1.5;background:var(--code-bg);border:1px solid var(--line);border-radius:var(--r-md);padding:14px 16px;overflow-x:auto;max-width:100%}
+pre code{background:none;border:0;padding:0;font-size:inherit;overflow-wrap:normal}
+h1,h2,h3,h4{line-height:1.2;color:var(--ink);font-weight:700;letter-spacing:-.01em}
+h2{font-size:clamp(26px,4vw,34px);margin:0 0 6px}
+h3{font-size:21px;margin:32px 0 8px}
+h4{font-size:17px;margin:20px 0 6px}
+p{margin:0 0 12px}
+ul,ol{margin:0 0 12px;padding-left:22px}
+li{margin:3px 0}
+.muted{color:var(--muted)}
+.small{font-size:14px}
+/* ---------- masthead ---------- */
+.masthead{background:var(--c800);color:#f0efed;padding:44px 16px 36px;border-bottom:1px solid var(--c400)}
+.masthead .inner{max-width:1180px;margin:0 auto}
+.brand{display:flex;align-items:center;gap:14px;margin-bottom:16px}
+.brand img{width:44px;height:44px;border-radius:10px}
+.kicker{display:inline-block;font-size:12px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;color:var(--electric);border:1px solid #6b7020;border-radius:999px;padding:5px 12px}
+.masthead h1{font-size:clamp(38px,7vw,62px);margin:0;color:#fff;letter-spacing:-.02em}
+.masthead .tagline{font-size:clamp(19px,3vw,24px);color:#d9d9d9;margin:6px 0 16px}
+.masthead .meta{font-size:14px;color:var(--smoke700);margin:0}
+.masthead .truth{margin-top:12px;font-size:14px;color:#f0efed;background:rgba(255,255,255,.05);border-left:3px solid var(--electric);padding:8px 12px;border-radius:0 8px 8px 0;display:inline-block}
+.masthead code{background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.15);color:#fff}
+/* ---------- layout ---------- */
+.layout{max-width:1180px;margin:0 auto;padding:0 16px;display:grid;grid-template-columns:250px minmax(0,1fr);gap:40px}
+nav.toc{position:sticky;top:0;align-self:start;max-height:100vh;overflow-y:auto;padding:24px 0}
+nav.toc .toc-title{font-size:12px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);margin:0 0 8px}
+nav.toc ol{list-style:none;padding:0;margin:0}
+nav.toc li{margin:0}
+nav.toc a{display:block;padding:5px 10px;border-radius:8px;color:var(--ink);text-decoration:none;font-size:14.5px;line-height:1.35}
+nav.toc a:hover{background:var(--card2)}
+nav.toc a.active{background:var(--card2);color:var(--accent);font-weight:600}
+nav.toc a .n{display:inline-block;width:24px;color:var(--muted);font-variant-numeric:tabular-nums}
+#toc-toggle{position:absolute;opacity:0;pointer-events:none}
+.toc-button{display:none}
+main{min-width:0;padding:8px 0 80px}
+section.doc{padding:40px 0 12px;border-bottom:1px solid var(--line);scroll-margin-top:12px}
+section.doc:last-child{border-bottom:0}
+.sec-num{font-size:12px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:var(--accent);margin-bottom:4px}
+.lede{font-size:18px;color:var(--muted);margin-bottom:18px}
+h3[id],h4[id]{scroll-margin-top:12px}
+@media (max-width:900px){
+  .layout{grid-template-columns:minmax(0,1fr);gap:0}
+  nav.toc{position:sticky;top:0;z-index:20;max-height:none;overflow:visible;padding:0;margin:0 -16px;background:var(--panel);border-bottom:1px solid var(--line)}
+  .toc-button{display:block;padding:12px 16px;font-weight:600;cursor:pointer}
+  nav.toc .toc-title{display:none}
+  nav.toc ol{display:none;padding:0 8px 12px;max-height:70vh;overflow-y:auto}
+  #toc-toggle:checked ~ ol{display:block}
+}
+/* ---------- blocks ---------- */
+.pillars{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin:12px 0 16px}
+.pillar{background:var(--card);border:1px solid var(--line);border-radius:var(--r-md);padding:14px 16px}
+.pillar h4{margin:0 0 4px;font-size:16px}
+.pillar p{margin:0;font-size:14.5px;color:var(--muted)}
+.callout{background:var(--card);border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:0 var(--r-md) var(--r-md) 0;padding:12px 16px;margin:14px 0}
+.callout.warn{border-left-color:var(--warn)}
+.callout.gap{border-left-color:var(--bad)}
+.callout p:last-child{margin:0}
+.tbl{overflow-x:auto;margin:12px 0 16px;border:1px solid var(--line);border-radius:var(--r-md);background:var(--card)}
+table{border-collapse:collapse;width:100%;font-size:14.5px}
+th,td{text-align:left;vertical-align:top;padding:9px 12px;border-bottom:1px solid var(--line)}
+th{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);background:var(--card2)}
+tr:last-child td{border-bottom:0}
+td.k{font-weight:600;white-space:nowrap}
+.chip{display:inline-block;font-size:12px;font-weight:600;padding:1px 9px;border-radius:999px;border:1px solid var(--border);color:var(--muted);white-space:nowrap}
+.chip.built{color:var(--ok);border-color:var(--ok)}
+.chip.partial{color:var(--warn);border-color:var(--warn)}
+.chip.todo{color:var(--bad);border-color:var(--bad)}
+.chip.mock{color:var(--accent);border-color:var(--accent)}
+figure{margin:18px 0;min-width:0}
+figure img{display:block;max-width:100%;height:auto;border-radius:var(--r-md);border:1px solid var(--line);box-shadow:var(--shadow)}
+figcaption{font-size:14px;color:var(--muted);margin-top:8px}
+.gallery{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:18px}
+.gallery figure{margin:0}
+/* ---------- journeys ---------- */
+.journey{background:var(--card);border:1px solid var(--line);border-radius:var(--r-lg);padding:18px 20px;margin:16px 0}
+.journey > h4{margin:0 0 2px;font-size:19px}
+.journey .who{font-size:14px;color:var(--muted);margin-bottom:12px}
+ol.steps{list-style:none;padding:0;margin:0;counter-reset:step}
+ol.steps > li{counter-increment:step;position:relative;padding:0 0 12px 40px;margin:0}
+ol.steps > li::before{content:counter(step);position:absolute;left:0;top:1px;width:26px;height:26px;border-radius:50%;background:var(--card2);border:1px solid var(--border);font-size:13px;font-weight:700;display:grid;place-items:center;color:var(--ink)}
+ol.steps > li b{display:block}
+.today{font-size:13.5px;color:var(--muted);border-top:1px dashed var(--line);margin-top:4px;padding-top:10px}
+/* ---------- product mockups (always ComfyUI dark) ---------- */
+.mock{--bg:var(--c800);background:var(--c800);color:#f0efed;border:1px solid var(--c400);border-radius:14px;overflow:hidden;box-shadow:var(--shadow);font:13px/1.45 var(--sans);margin:16px 0}
+.mock *{box-sizing:border-box}
+.mock .bar{display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:1px solid var(--c400);flex-wrap:wrap}
+.mock .seg{display:inline-flex;background:var(--c700);border:1px solid var(--c400);border-radius:8px;overflow:hidden}
+.mock .seg span{padding:4px 12px;color:var(--smoke700)}
+.mock .seg span.on{background:var(--c400);color:#fff}
+.mock .sel{background:var(--c600);border-radius:8px;padding:4px 10px;display:inline-flex;align-items:center;gap:8px}
+.mock .dot{width:8px;height:8px;border-radius:50%;background:#33c46b;display:inline-block}
+.mock .dim{color:var(--smoke700)}
+.mock .btn{background:var(--c600);border-radius:8px;padding:5px 12px;display:inline-block;white-space:nowrap}
+.mock .btn.ghost{background:transparent}
+.mock .btn.primary{background:var(--azure600);color:#fff;font-weight:600}
+.mock .body{display:grid;grid-template-columns:300px minmax(0,1fr);min-height:420px}
+.mock .left{border-right:1px solid var(--c400);padding:12px;display:flex;flex-direction:column;gap:8px;min-width:0}
+.mock .main{padding:12px;display:flex;flex-direction:column;gap:10px;min-width:0}
+.mock .card{background:var(--c600);border-radius:8px;padding:10px 12px}
+.mock .label{font-size:11px;font-weight:700;letter-spacing:.06em;color:var(--smoke700);text-transform:uppercase;margin-bottom:6px}
+.mock .field{background:var(--c700);border:1px solid var(--c400);border-radius:8px;padding:6px 9px;color:#e9e9e9}
+.mock .field.tall{min-height:76px}
+.mock .chipm{display:inline-block;background:var(--c400);border-radius:999px;padding:1px 9px;font-size:11.5px;color:var(--smoke700)}
+.mock .picker{display:flex;align-items:center;gap:10px;background:var(--c600);border-radius:8px;padding:8px 10px}
+.mock .picker img{width:20px;height:20px;border-radius:4px}
+.mock .runbar{display:flex;gap:8px;margin-top:auto}
+.mock .runbar .n{width:56px;text-align:center}
+.mock .runbar .btn.primary{flex:1;text-align:center;padding:10px;font-size:15px}
+.mock .preview{flex:1;min-height:230px;border-radius:12px;background:var(--c700);display:grid;place-items:center;position:relative;overflow:hidden}
+.mock .tex{width:min(100%,300px);aspect-ratio:1;border-radius:6px;
+  background:
+    radial-gradient(circle at 20% 30%,#5f7a3f 0 9%,transparent 10%),
+    radial-gradient(circle at 70% 25%,#6b7f45 0 8%,transparent 9%),
+    radial-gradient(circle at 45% 70%,#55703a 0 10%,transparent 11%),
+    radial-gradient(circle at 85% 80%,#617c41 0 7%,transparent 8%),
+    repeating-linear-gradient(0deg,#3c3a33 0 2px,transparent 2px 48px),
+    repeating-linear-gradient(90deg,#3c3a33 0 2px,transparent 2px 60px),
+    linear-gradient(135deg,#7c7766,#6a6556 45%,#5d5a4d);}
+.mock .actions{display:flex;gap:6px;flex-wrap:wrap}
+.mock .strip{display:flex;gap:8px;overflow:hidden}
+.mock .thumb{width:64px;height:64px;border-radius:8px;background:var(--c600);border:1px solid var(--c400);flex:none;position:relative;overflow:hidden}
+.mock .thumb.on{border:2px solid var(--azure600)}
+.mock .thumb .tex{width:100%;border-radius:0}
+.mock .thumb .prog{position:absolute;left:6px;right:6px;bottom:6px;height:4px;border-radius:2px;background:var(--c400)}
+.mock .thumb .prog i{display:block;height:100%;width:62%;background:var(--azure400);border-radius:2px}
+.mock .thumb .st{position:absolute;inset:0;display:grid;place-items:center;font-size:11px;color:var(--smoke700)}
+.mock .drop{border:1px dashed var(--c200);border-radius:12px;padding:16px;text-align:center;color:var(--smoke700);background:var(--c700)}
+.mock .grid3{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:10px}
+.mock .wcard{background:var(--c600);border-radius:10px;padding:12px;min-height:96px}
+.mock .wcard b{display:block;margin-bottom:4px}
+.mock .sec{font-size:11px;font-weight:700;letter-spacing:.08em;color:var(--smoke700);margin:8px 0 2px}
+.mock.dialog{max-width:520px}
+.mock .menu{background:var(--c700);border:1px solid var(--c400);border-radius:10px;padding:6px;min-width:230px}
+.mock .menu div{padding:6px 10px;border-radius:6px}
+.mock .menu div.hi{background:var(--c400)}
+.mock .menu hr{border:0;border-top:1px solid var(--c400);margin:4px 0}
+.mock .node{background:#353535;border-radius:8px;border:1px solid #4a4a4a;width:220px;position:relative}
+.mock .node .hd{background:#2a2a2a;padding:6px 10px;border-radius:8px 8px 0 0;font-weight:600}
+.mock .node .w{padding:5px 10px;display:flex;justify-content:space-between;color:#ccc}
+.mock .ue{position:absolute;top:-9px;right:10px;background:var(--electric);color:#111;font-size:10.5px;font-weight:800;border-radius:999px;padding:1px 7px}
+@media (max-width:760px){.mock .body{grid-template-columns:minmax(0,1fr)}.mock .left{border-right:0;border-bottom:1px solid var(--c400)}}
+.swatches{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin:12px 0}
+.sw{border:1px solid var(--line);border-radius:var(--r-md);overflow:hidden;background:var(--card);font-size:13px}
+.sw i{display:block;height:46px}
+.sw div{padding:7px 10px}
+.sw code{font-size:12px}
+svg.diagram{width:100%;height:auto;display:block}
+.diagram-wrap{background:var(--card);border:1px solid var(--line);border-radius:var(--r-lg);padding:14px;margin:16px 0;overflow-x:auto}
+.diagram-wrap svg{min-width:640px}
+</style>
+</head>
+<body>
+
+<header class="masthead">
+  <div class="inner">
+    <div class="brand"><img src="{{img:comfy-icon.png}}" alt=""><span class="kicker">Living design document</span></div>
+    <h1>Comfy for Unreal</h1>
+    <p class="tagline">ComfyUI inside the Unreal Editor. Workflows in, game-ready assets out.</p>
+    <p class="meta">Version 0.1 · 2026-10-24 · Comfy Org DevRel · Status: proof of concept, built for UE 5.8</p>
+    <p class="truth">This is the source of truth for the product's experience and design. It extends the earlier proposal page and <code>docs/SPEC.md</code>, and the <a href="#changelog" style="color:#31b9f4">changelog</a> records each revision.</p>
+  </div>
+</header>
+
+<div class="layout">
+<nav class="toc" aria-label="Contents">
+  <input type="checkbox" id="toc-toggle">
+  <label class="toc-button" for="toc-toggle">Contents</label>
+  <p class="toc-title">Contents</p>
+  <ol>
+    <li><a href="#overview"><span class="n">1</span>Overview</a></li>
+    <li><a href="#shape"><span class="n">2</span>Product shape</a></li>
+    <li><a href="#people"><span class="n">3</span>Who it's for</a></li>
+    <li><a href="#ux"><span class="n">4</span>The user experience</a></li>
+    <li><a href="#studio"><span class="n">5</span>Comfy Studio</a></li>
+    <li><a href="#extension"><span class="n">6</span>The ComfyUI extension</a></li>
+    <li><a href="#workflows"><span class="n">7</span>Workflows and the manifest</a></li>
+    <li><a href="#backends"><span class="n">8</span>Backends</a></li>
+    <li><a href="#automation"><span class="n">9</span>Blueprint, Python and agents</a></li>
+    <li><a href="#visual"><span class="n">10</span>Visual design</a></li>
+    <li><a href="#state"><span class="n">11</span>Where it stands</a></li>
+    <li><a href="#roadmap"><span class="n">12</span>Roadmap</a></li>
+    <li><a href="#questions"><span class="n">13</span>Open questions</a></li>
+    <li><a href="#decisions"><span class="n">14</span>Decision log</a></li>
+    <li><a href="#changelog"><span class="n">15</span>Changelog</a></li>
+  </ol>
+</nav>
+
+<main>
+
+<!-- ============================================================ 1 -->
+<section class="doc" id="overview">
+  <div class="sec-num">01</div>
+  <h2>Overview</h2>
+  <p class="lede">An official Comfy plugin for Unreal Engine. Artists run ComfyUI workflows from a panel that looks and feels like ComfyUI, on their own GPU or on Comfy Cloud, and get real Unreal assets back: textures and materials, sounds, meshes.</p>
+  <p>Comfy for Unreal is two pieces that work as one product. <b>Comfy Studio</b> is a tab inside the Unreal Editor with two views: <b>Run</b>, laid out like ComfyUI's App mode, and <b>Graph</b>, the ComfyUI frontend itself. The <b>Comfy for Unreal extension</b> lives inside ComfyUI and lets a workflow author mark which inputs Unreal may change and what each output becomes in the project, the way NVIDIA's RTX Remix tags workflows for its toolkit.</p>
+  <p>Everything Studio does is also available to Blueprints, Python and AI agents through Epic's Unreal MCP server, so the same workflow can be run by a person, a script or an agent.</p>
+
+  <h3 id="pillars">Design pillars</h3>
+  <div class="pillars">
+    <div class="pillar"><h4>Feels like Comfy</h4><p>Comfy's palette, type and App mode layout, not an Unreal details panel. Anyone who knows ComfyUI is at home.</p></div>
+    <div class="pillar"><h4>Assets, not files</h4><p>Results land as Unreal assets with the right import settings and a record of how they were made.</p></div>
+    <div class="pillar"><h4>One workflow, any backend</h4><p>The same workflow runs on Comfy Desktop, a local install, Comfy Cloud or an API deployment. Model choices adapt to what each backend has.</p></div>
+    <div class="pillar"><h4>Authored in ComfyUI</h4><p>Workflows are built in ComfyUI and tagged there. Unreal never edits graphs; it runs them.</p></div>
+    <div class="pillar"><h4>Never surprising</h4><p>No silent credit spend, no keys in project files, nothing replaced in a level that can't be reverted.</p></div>
+  </div>
+
+  <h3 id="why">Why now</h3>
+  <p>Epic's 2026 AI MegaJam starts on <b>November 12</b>. UE 5.8 ships Epic's own MCP server with a toolset registry, so agents already live inside the editor. Comfy Cloud removes the GPU barrier for jam teams on laptops. And RTX Remix 1.6.1 (October 23) just showed the pattern in a shipped game tool: ComfyUI as the engine, tagged workflows as the contract.</p>
+</section>
+
+<!-- ============================================================ 2 -->
+<section class="doc" id="shape">
+  <div class="sec-num">02</div>
+  <h2>Product shape</h2>
+  <p class="lede">Unreal runs workflows; ComfyUI authors them. A small JSON manifest is the contract between the two.</p>
+
+  <div class="diagram-wrap">
+  <svg class="diagram" viewBox="0 0 900 360" role="img" aria-labelledby="fig-shape">
+    <title id="fig-shape">Comfy Studio in the Unreal Editor talks to a ComfyUI server (Desktop or a local install, with the Comfy for Unreal extension) or to Comfy Cloud, and imports results as assets.</title>
+    <defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="currentColor"/></marker></defs>
+    <g font-family="Inter,system-ui,sans-serif" font-size="13" fill="currentColor" style="color:var(--muted)">
+      <rect x="10" y="20" width="340" height="320" rx="14" fill="none" stroke="var(--border)"/>
+      <text x="26" y="44" font-weight="700" fill="var(--ink)">Unreal Editor</text>
+      <rect x="26" y="58" width="308" height="120" rx="10" fill="var(--card2)" stroke="var(--line)"/>
+      <text x="40" y="80" font-weight="700" fill="var(--ink)">Comfy Studio</text>
+      <text x="40" y="102">Run view: App-mode form, gallery,</text>
+      <text x="40" y="120">Import · Replace · Revert</text>
+      <text x="40" y="146">Graph view: ComfyUI frontend in an</text>
+      <text x="40" y="164">embedded browser + Send to Unreal</text>
+      <rect x="26" y="190" width="148" height="60" rx="10" fill="var(--card2)" stroke="var(--line)"/>
+      <text x="40" y="214" font-weight="700" fill="var(--ink)">Blueprint, Python</text>
+      <text x="40" y="234">same API as Studio</text>
+      <rect x="186" y="190" width="148" height="60" rx="10" fill="var(--card2)" stroke="var(--line)"/>
+      <text x="200" y="214" font-weight="700" fill="var(--ink)">Agent toolset</text>
+      <text x="200" y="234">Epic's Unreal MCP</text>
+      <rect x="26" y="262" width="308" height="62" rx="10" fill="var(--card2)" stroke="var(--line)"/>
+      <text x="40" y="286" font-weight="700" fill="var(--ink)">/Game/Comfy/…  project assets</text>
+      <text x="40" y="306">T_ textures, MI_ materials, SW_ sounds, SM_ meshes</text>
+
+      <rect x="550" y="20" width="340" height="190" rx="14" fill="none" stroke="var(--border)"/>
+      <text x="566" y="44" font-weight="700" fill="var(--ink)">ComfyUI server (Desktop or local)</text>
+      <rect x="566" y="58" width="308" height="66" rx="10" fill="var(--card2)" stroke="var(--line)"/>
+      <text x="580" y="82" font-weight="700" fill="var(--ink)">Comfy for Unreal extension</text>
+      <text x="580" y="102">tag inputs and outputs, Send to Unreal,</text>
+      <text x="580" y="118" dy="-0">workflow library, editor heartbeat</text>
+      <rect x="566" y="134" width="308" height="62" rx="10" fill="var(--card2)" stroke="var(--line)"/>
+      <text x="580" y="158" font-weight="700" fill="var(--ink)">ComfyUI</text>
+      <text x="580" y="178">/prompt · /history · /view · /ws</text>
+
+      <rect x="550" y="232" width="340" height="108" rx="14" fill="none" stroke="var(--border)"/>
+      <text x="566" y="256" font-weight="700" fill="var(--ink)">Comfy Cloud and API deployments</text>
+      <text x="566" y="278">Comfy API v2: assets, jobs, outputs</text>
+      <text x="566" y="298">Cloud frontend at cloud.comfy.org</text>
+      <text x="566" y="318">No custom nodes: tags travel in the workflow</text>
+
+      <g style="color:var(--accent)" stroke="currentColor" stroke-width="2" fill="none">
+        <path d="M350 100 L548 100" marker-end="url(#ar)"/>
+        <path d="M548 120 L352 120" marker-end="url(#ar)"/>
+        <path d="M350 160 C450 160 450 280 548 280" marker-end="url(#ar)"/>
+      </g>
+      <text x="380" y="92" style="fill:var(--accent)">run, upload, poll, download</text>
+      <text x="380" y="140" style="fill:var(--accent)">workflow + manifest</text>
+      <text x="400" y="246" style="fill:var(--accent)">same calls, API key</text>
+    </g>
+  </svg>
+  </div>
+
+  <div class="tbl"><table>
+    <thead><tr><th>Piece</th><th>Where it lives</th><th>What it does</th></tr></thead>
+    <tbody>
+      <tr><td class="k">Comfy Studio</td><td>Unreal plugin, editor tab</td><td>Run workflows, preview and import results, edit graphs in ComfyUI without leaving the editor.</td></tr>
+      <tr><td class="k">ComfyCore</td><td>Unreal plugin, runtime module</td><td>Backends, jobs, workflow assets, model resolution, runtime loaders. Works in packaged games for Cloud-backed features later.</td></tr>
+      <tr><td class="k">ComfyAgent</td><td>Unreal plugin, editor module</td><td>The <code>ComfyAgent.ComfyToolset</code> registered with Epic's MCP toolset registry.</td></tr>
+      <tr><td class="k">Comfy for Unreal extension</td><td>ComfyUI custom node pack (no compute nodes)</td><td>Tag a workflow for Unreal, send it to the editor, keep a library on the server.</td></tr>
+      <tr><td class="k">Manifest</td><td><code>workflow.extra.comfy_unreal</code></td><td>The contract: exposed inputs, tagged outputs, workflow type. See <a href="#workflows">section 7</a>.</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<!-- ============================================================ 3 -->
+<section class="doc" id="people">
+  <div class="sec-num">03</div>
+  <h2>Who it's for</h2>
+  <p class="lede">Three people use it by hand, one uses it through an agent. Each needs a different depth.</p>
+  <div class="tbl"><table>
+    <thead><tr><th>Who</th><th>What they want</th><th>Where they spend their time</th></tr></thead>
+    <tbody>
+      <tr><td class="k">Level or environment artist</td><td>A tileable material for this wall, now, without learning ComfyUI.</td><td>Run view. Never opens Graph.</td></tr>
+      <tr><td class="k">Sound designer</td><td>Ten footstep variations, imported and ready for a MetaSound.</td><td>Run view, batch count, the result strip.</td></tr>
+      <tr><td class="k">Technical artist, workflow author</td><td>Build the studio's house workflows once and give the team a simple form.</td><td>Graph view and ComfyUI with the extension. Ships workflows as assets in source control.</td></tr>
+      <tr><td class="k">Jam team or solo developer</td><td>Placeholder art, props and sound fast, on a laptop with no big GPU.</td><td>Run view on Comfy Cloud, built-in workflows.</td></tr>
+      <tr><td class="k">AI agent (through Unreal MCP)</td><td>"Make this wall mossy brick" in one call, with the result assigned and read back.</td><td><code>GenerateMaterial</code>, <code>RunWorkflow</code>, <code>WaitForJob</code>.</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<!-- ============================================================ 4 -->
+<section class="doc" id="ux">
+  <div class="sec-num">04</div>
+  <h2>The user experience</h2>
+  <p class="lede">Seven journeys, from first launch to an agent doing the work. Each lists what the user does, what they see, and where today's build falls short.</p>
+  <p class="small muted">Chips mark the state of each journey: <span class="chip built">built</span> works in the current build, <span class="chip partial">partial</span> works with gaps, <span class="chip todo">to build</span> is designed here but not built.</p>
+
+  <!-- J1 -->
+  <div class="journey" id="j-first-run">
+    <h4>1. First run: from install to a connected backend <span class="chip partial">partial</span></h4>
+    <div class="who">Anyone, once per machine. Goal: under two minutes from enabling the plugin to "Connected".</div>
+    <ol class="steps">
+      <li><b>Install and enable.</b> From Fab (later) or a GitHub release now. Enabling pulls in Epic's ToolsetRegistry and Python plugins.</li>
+      <li><b>Find it.</b> A <b>Comfy</b> button with the Comfy logo sits in the level toolbar, and <i>Tools › Comfy Studio</i> opens the same tab.</li>
+      <li><b>Connect.</b> Studio looks for a ComfyUI it can reach: Comfy Desktop first, then a local install. If one answers, the status line turns green: <i>Connected · ComfyUI 0.39.0, RTX 4080, 14.7 GB free</i>.</li>
+      <li><b>No local ComfyUI?</b> A welcome card offers two paths: <b>Use Comfy Cloud</b> or <b>Download Comfy Desktop</b>. Use Comfy Cloud opens Comfy's own sign-in (Google, GitHub or email) inside the panel. When it finishes, the status line reads <i>Signed in · Joshua · 5 runs left</i>, and Run works with no key. See <a href="#cloud-sign-in">Signing in to Comfy Cloud</a>.</li>
+      <li><b>Land on the library.</b> With no workflow chosen, the main area shows workflow cards grouped by type, so the first click is "what do I want to make?".</li>
+    </ol>
+    <div class="today">Today: the toolbar button, connection states and the library are built. Gaps: there is no auto-detection (the Desktop profile assumes <code>127.0.0.1:8188</code>, while Comfy Desktop's default is <code>8000</code>), no welcome card. Cloud sign-in already works in the Graph view (tested October 24), but Run still asks for an API key: the status line says "No API key" while the page beside it is signed in. Fixing that is the <a href="#cloud-sign-in">page bridge</a>.</div>
+  </div>
+
+  <div class="mock" role="img" aria-label="Mockup: first-run welcome card in Comfy Studio">
+    <div class="bar"><span class="seg"><span class="on">Run</span><span>Graph</span></span><span class="sel">Desktop ▾</span><span class="dot" style="background:#a0a0a0"></span><span class="dim">Disconnected · nothing answered on 127.0.0.1:8000 or :8188</span><span style="flex:1"></span><span class="btn">Retry</span><span class="btn ghost">Settings</span></div>
+    <div style="padding:28px;display:grid;place-items:center">
+      <div class="card" style="max-width:520px;padding:20px 22px">
+        <div style="display:flex;gap:12px;align-items:center;margin-bottom:8px"><img src="{{img:comfy-icon.png}}" alt="" style="width:32px;height:32px;border-radius:8px"><b style="font-size:17px">Connect Comfy</b></div>
+        <p class="dim" style="margin:0 0 14px">Run workflows on your own GPU with Comfy Desktop, or on Comfy Cloud from any laptop.</p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap"><span class="btn primary">Use Comfy Cloud</span><span class="btn">Download Comfy Desktop</span><span class="btn ghost">Connect to a URL…</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- J2 -->
+  <div class="journey" id="j-material">
+    <h4>2. Make a material from a prompt <span class="chip built">built</span></h4>
+    <div class="who">Environment artist. Goal: a tileable PBR material on the selected wall in under a minute, without touching ComfyUI.</div>
+    <ol class="steps">
+      <li><b>Pick a workflow.</b> Click the <i>Seamless Texture</i> card, or use the picker at the top of the left column.</li>
+      <li><b>Describe the surface.</b> The prompt box is the biggest thing on screen: <i>mossy cobblestone path</i>. Seed is on Randomize, model dropdowns already hold the best match the backend has.</li>
+      <li><b>Run.</b> The big blue button at the bottom, with a batch count beside it. Each run appears in the result strip with a progress bar; the status line counts running jobs.</li>
+      <li><b>Look.</b> The finished texture fills the preview. Click other results in the strip to compare.</li>
+      <li><b>Use it.</b> <b>Replace on selection</b> builds <code>T_…_D</code>, a derived <code>T_…_N</code> and an <code>MI_…</code>, and puts the material on every mesh slot of the selected actors. <b>Revert</b> puts the old materials back and keeps the assets. Ctrl+Z works too.</li>
+    </ol>
+    <div class="today">Today: built in the new Run view (package compiled, screenshot pending an editor restart). Import is automatic by default; turn it off under "In Unreal" to only import what you keep.</div>
+  </div>
+
+  <div class="mock" role="img" aria-label="Mockup: the Run view with a texture result">
+    <div class="bar"><span class="seg"><span class="on">Run</span><span>Graph</span></span><span class="sel">Desktop ▾</span><span class="dot"></span><span class="dim">Connected · ComfyUI 0.39.0, RTX 4080, 14.7 GB free</span><span style="flex:1"></span><span class="dim">1 running</span><span class="btn">Check</span><span class="btn ghost">Settings</span></div>
+    <div class="body">
+      <div class="left">
+        <div class="picker"><img src="{{img:comfy-icon.png}}" alt=""><div style="flex:1;min-width:0"><b>Seamless Texture (Cloud)</b><div class="dim" style="font-size:12px">Texture · Built-in</div></div><span class="dim">▾</span></div>
+        <div class="card"><div class="label">Surface</div><div class="field tall">mossy cobblestone path, wet after rain</div></div>
+        <div class="card"><div class="label">Seed</div><div style="display:flex;gap:8px;align-items:center"><div class="field" style="flex:1;color:#a0a0a0">New seed every run</div><span>☑ Randomize</span></div></div>
+        <div class="card"><div class="label">Checkpoint</div><div class="field">flux1-schnell-fp8.safetensors ▾</div></div>
+        <div class="card"><div class="label">Width · Height · Steps</div><div style="display:flex;gap:6px"><div class="field" style="flex:1">1024</div><div class="field" style="flex:1">1024</div><div class="field" style="flex:1">4</div></div></div>
+        <div class="card"><div class="label">In Unreal</div><div>☑ Import results when they finish<br>☑ Make a material from images<br>☑ Tileable, with a derived normal map</div></div>
+        <div class="runbar"><div class="field n">4</div><span class="btn primary">Run</span></div>
+      </div>
+      <div class="main">
+        <div class="preview"><div class="tex"></div></div>
+        <div class="actions"><span class="btn primary">Import</span><span class="btn">Replace on selection</span><span class="btn">Revert</span><span class="btn">Show in Content Browser</span><span class="btn ghost">Open in Graph</span></div>
+        <div class="strip">
+          <div class="thumb"><div class="st">Queued</div></div>
+          <div class="thumb"><div class="st">62%</div><div class="prog"><i></i></div></div>
+          <div class="thumb on"><div class="tex"></div></div>
+          <div class="thumb"><div class="tex" style="filter:hue-rotate(40deg) brightness(.9)"></div></div>
+          <div class="thumb"><div class="tex" style="filter:saturate(.4)"></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <p class="small muted" style="margin-top:-6px">Mockup of the Run view as built in commit <code>350a43d</code>, drawn with the same tokens. The texture is a placeholder pattern.</p>
+
+  <!-- J3 -->
+  <div class="journey" id="j-selection">
+    <h4>3. Start from what's in the level <span class="chip built">built</span></h4>
+    <div class="who">Artist restyling existing content. Goal: use a texture, mesh or the viewport as the input without exporting anything by hand.</div>
+    <ol class="steps">
+      <li><b>Pick a workflow with an image input</b>, such as Image to Mesh or a restyle workflow.</li>
+      <li><b>Fill the drop zone</b> one of four ways: drag a texture from the Content Browser, drag a file from Explorer, press <b>Use selection</b>, or press <b>Viewport</b> to capture the active view.</li>
+      <li><b>Run.</b> Studio writes textures to <code>Saved/Comfy/Inputs</code> as PNG and uploads them; meshes and sounds go as the file they were imported from.</li>
+    </ol>
+    <div class="today">Today: built. Viewport capture is the beauty pass only; depth and normal passes for ControlNet-style workflows are on the roadmap.</div>
+  </div>
+
+  <!-- J4 -->
+  <div class="journey" id="j-author">
+    <h4>4. Author a workflow for the team <span class="chip partial">partial</span></h4>
+    <div class="who">Technical artist. Goal: turn a ComfyUI graph into a one-screen form the whole team can use, with outputs that import correctly.</div>
+    <ol class="steps">
+      <li><b>Build the graph in ComfyUI</b>, either in Studio's Graph view (the real ComfyUI frontend, inside Unreal) or in Comfy Desktop.</li>
+      <li><b>Expose inputs.</b> Right-click a node › <i>Comfy for Unreal › Expose input to Unreal</i>. Pick the widget, give it a label and say where the value comes from: the form, the main prompt, selected textures or meshes, or a viewport capture.</li>
+      <li><b>Tag outputs.</b> On a save node, <i>Tag output for Unreal</i>: a Texture with its slot (Base Color, Normal, Roughness, Metallic, AO, Height, ORM, Emissive, Opacity), or an Image, Sound, Music or Mesh. Tagged nodes show a small <b>UE</b> badge.</li>
+      <li><b>Send to Unreal.</b> The action bar button opens a dialog: name, type, description, group and a thumbnail from the last result. The workflow is saved on the ComfyUI server and, inside Studio, lands as a Comfy Workflow asset in <code>/Game/Comfy/Workflows</code>.</li>
+      <li><b>Share it.</b> The asset goes into source control with the project. Teammates connected to the same ComfyUI also see it under <b>Server</b> in the picker.</li>
+    </ol>
+    <div class="today">Today: Graph view and Send to Unreal are built and tested; Jones sent a 18-input texture workflow and ran it. The extension (tagging, dialog, sidebar, library) is built but not yet tried in a browser: it loads on the next ComfyUI restart.</div>
+  </div>
+
+  <figure>
+    <img src="{{img:graph-live.jpg}}" alt="Comfy Studio's Graph view in Unreal, showing the ComfyUI frontend with a PBR texture workflow and the job queue">
+    <figcaption>The Graph view today: ComfyUI's own frontend inside Comfy Studio, after <b>Send to Unreal</b> saved <code>CW_texture_generation_v3</code> with 18 inputs.</figcaption>
+  </figure>
+
+  <!-- J5 -->
+  <div class="journey" id="j-backend">
+    <h4>5. Switch between my GPU and the cloud <span class="chip built">built</span></h4>
+    <div class="who">Anyone. Goal: the same workflow runs locally or on Comfy Cloud without editing it.</div>
+    <ol class="steps">
+      <li><b>Pick a backend</b> in the status line: Desktop, Comfy Cloud, or a deployment the studio set up.</li>
+      <li><b>Studio checks it</b> and the dot shows Connecting, then Connected or Failed with the reason (no key, out of credits, unreachable).</li>
+      <li><b>Model dropdowns refill</b> from that backend's model list, and each picks the workflow's preferred file again. A workflow that wants <code>flux_vae</code> never silently gets a 4-channel VAE that happens to be named <code>ae.safetensors</code>.</li>
+      <li><b>Credits are visible.</b> Runs that spend Comfy credits say so before you press Run.</li>
+    </ol>
+    <div class="today">Today: switching is built. On Cloud, Run and the model list need an API key; with the page bridge they will use the Graph view's sign-in instead.</div>
+  </div>
+
+  <!-- J6 -->
+  <div class="journey" id="j-agent">
+    <h4>6. Let an agent do it <span class="chip built">built</span></h4>
+    <div class="who">A developer driving the editor through Unreal MCP. Goal: one call from intent to assigned asset, with consent before spending.</div>
+    <ol class="steps">
+      <li><b>The agent discovers the toolset:</b> <code>list_toolsets</code> shows <code>ComfyAgent.ComfyToolset</code> with 18 tools.</li>
+      <li><b>One call:</b> <code>GenerateMaterial(prompt: "weathered red brick", bAssignToSelection: true)</code> runs a texture workflow, waits, builds the material and assigns it.</li>
+      <li><b>Consent:</b> if the run spends credits, the tool refuses with a message telling the agent to ask the user, then retry with <code>bAllowCreditSpend</code>.</li>
+      <li><b>Show the user:</b> <code>OpenStudio("Run")</code> brings the panel up with the result in the gallery.</li>
+    </ol>
+  </div>
+
+  <!-- J7 -->
+  <div class="journey" id="j-errors">
+    <h4>7. When something goes wrong <span class="chip partial">partial</span></h4>
+    <div class="who">Everyone, sooner or later. Goal: every failure says what happened and offers the next step, in the place the user is looking.</div>
+    <div class="tbl"><table>
+      <thead><tr><th>What happens</th><th>What the user sees</th><th>Next step offered</th></tr></thead>
+      <tbody>
+        <tr><td>ComfyUI isn't running</td><td>Red dot, "Connection failed · couldn't connect to 127.0.0.1:8188"</td><td>Retry; Settings. <span class="chip todo">to build</span> Launch Comfy Desktop.</td></tr>
+        <tr><td>Cloud, not signed in and no key</td><td>Today: a red "No API key" message, even while the Graph view is signed in</td><td><span class="chip todo">to build</span> "Sign in to Comfy Cloud" opens the sign-in page; "Use an API key instead" opens the key steps.</td></tr>
+        <tr><td>API key refused (401)</td><td>"The API key was refused" with where keys are read from</td><td>Settings. <span class="chip todo">to build</span> Fall back to the signed-in page if there is one.</td></tr>
+        <tr><td>Free runs used up</td><td>Cloud's "0 / 5 runs left"</td><td><span class="chip todo">to build</span> Show the count in the status line before Run; link to Upgrade.</td></tr>
+        <tr><td>Out of credits (402)</td><td>"Out of credits. Add credits at platform.comfy.org"</td><td><span class="chip todo">to build</span> Open billing.</td></tr>
+        <tr><td>Workflow needs missing nodes</td><td>Warning above the form listing the node classes</td><td><span class="chip todo">to build</span> Install with ComfyUI Manager, or switch to Cloud.</td></tr>
+        <tr><td>Model file missing</td><td>The run fails in ComfyUI with its error</td><td><span class="chip todo">to build</span> A model check before Run, with a download offer (RTX Remix ships a download node for this).</td></tr>
+        <tr><td>Wrong model family picked</td><td>Today: a cryptic tensor-shape error from ComfyUI</td><td>Prefer lists avoid it; <span class="chip todo">to build</span> check the file's family before running.</td></tr>
+      </tbody>
+    </table></div>
+  </div>
+</section>
+
+<!-- ============================================================ 5 -->
+<section class="doc" id="studio">
+  <div class="sec-num">05</div>
+  <h2>Comfy Studio</h2>
+  <p class="lede">One tab, a slim status line, two views. The Run view borrows ComfyUI App mode's layout; the Graph view is ComfyUI itself.</p>
+
+  <h3 id="status-line">Status line</h3>
+  <p>Always visible, one row: the <b>Run | Graph</b> switch, the backend picker, a connection dot with a short summary (Disconnected, Connecting, Connected, Connection failed), a running-jobs count, <b>Check</b> or <b>Retry</b>, and <b>Settings</b>.</p>
+
+  <h3 id="run-view">Run view</h3>
+  <div class="tbl"><table>
+    <thead><tr><th>Area</th><th>Contents</th><th>State</th></tr></thead>
+    <tbody>
+      <tr><td class="k">Workflow picker</td><td>Name with type and origin (Project, Server, Built-in). The menu groups by origin, then type.</td><td><span class="chip built">built</span> Thumbnails <span class="chip todo">to build</span></td></tr>
+      <tr><td class="k">Input cards</td><td>One rounded card per exposed input. A tall prompt box; image drop zones; seed with Randomize; model and choice dropdowns; number fields.</td><td><span class="chip built">built</span> Sliders with ranges <span class="chip todo">to build</span></td></tr>
+      <tr><td class="k">In Unreal</td><td>Auto-import, make a material from images, tileable with derived normal, destination folder.</td><td><span class="chip built">built</span></td></tr>
+      <tr><td class="k">Run bar</td><td>Batch count and a large blue Run button, pinned to the bottom of the column.</td><td><span class="chip built">built</span></td></tr>
+      <tr><td class="k">Gallery</td><td>Large preview of the selected result, actions, then a strip of results and in-flight jobs with progress.</td><td><span class="chip built">built</span> Audio and mesh previews <span class="chip todo">to build</span></td></tr>
+      <tr><td class="k">Actions</td><td>Import, Replace on selection, Revert, Show in Content Browser, Open in Graph.</td><td><span class="chip built">built</span></td></tr>
+      <tr><td class="k">Empty state</td><td>"What do you want to make?" with workflow cards grouped by type.</td><td><span class="chip built">built</span></td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="mock" role="img" aria-label="Mockup: the empty state with workflow cards by type">
+    <div class="bar"><span class="seg"><span class="on">Run</span><span>Graph</span></span><span class="sel">Comfy Cloud ▾</span><span class="dot"></span><span class="dim">Connected · Comfy API v2 at cloud.comfy.org</span><span style="flex:1"></span><span class="btn">Check</span></div>
+    <div class="body">
+      <div class="left"><div class="picker"><img src="{{img:comfy-icon.png}}" alt=""><div><b>Choose a workflow</b><div class="dim" style="font-size:12px">5 available</div></div></div><div class="runbar"><div class="field n">1</div><span class="btn primary" style="opacity:.4">Run</span></div></div>
+      <div class="main">
+        <b style="font-size:17px">What do you want to make?</b>
+        <div class="dim">Pick a workflow. Send your own from the Graph view, or from ComfyUI with the Comfy for Unreal extension.</div>
+        <div class="sec">TEXTURE</div>
+        <div class="grid3">
+          <div class="wcard"><b>Seamless Texture (Cloud)</b><span class="dim">Core nodes only, runs on Cloud.</span><br><span class="chipm">Built-in</span></div>
+          <div class="wcard"><b>Seamless Texture (Flux Dev GGUF)</b><span class="dim">Higher quality, 12-16 GB GPUs.</span><br><span class="chipm">Built-in</span></div>
+          <div class="wcard"><b>texture-generation-v3</b><span class="dim">PBR maps for the studio's engine preset.</span><br><span class="chipm">Project</span></div>
+        </div>
+        <div class="sec">SOUND</div>
+        <div class="grid3"><div class="wcard"><b>Sound Effect (Stable Audio Open)</b><span class="dim">Up to 47 seconds, imported as a Sound Wave.</span><br><span class="chipm">Built-in</span></div></div>
+        <div class="sec">MESH</div>
+        <div class="grid3"><div class="wcard"><b>Image to Mesh (Hunyuan3D 2)</b><span class="dim">Untextured mesh from one image.</span><br><span class="chipm">Built-in</span></div></div>
+      </div>
+    </div>
+  </div>
+
+  <h3 id="graph-view">Graph view</h3>
+  <p>The active backend's ComfyUI frontend in Unreal's embedded browser (Chromium 128 through CEF): the local server's address, or <code>cloud.comfy.org</code> for Comfy Cloud. Sign-ins persist in <code>Saved/Comfy/Browser</code>, and sign-in popups open in their own window so Google and GitHub logins work.</p>
+  <p>A thin toolbar above the page offers <b>Send to Unreal</b>, <b>Open in Graph</b> (the workflow selected in Run), <b>Reload</b> and <b>Open in browser</b>. With the extension installed, ComfyUI's own action bar gets the richer Send dialog and the toolbar button becomes redundant.</p>
+  <div class="gallery">
+    <figure><img src="{{img:graph-cloud.jpg}}" alt="Comfy Cloud sign-in page inside Comfy Studio"><figcaption>Comfy Cloud's sign-in, inside the editor.</figcaption></figure>
+    <figure><img src="{{img:graph-desktop.jpg}}" alt="Graph view with ComfyUI not running"><figcaption>The Desktop backend with ComfyUI stopped: the page error is honest but plain. A friendlier empty state is on the list.</figcaption></figure>
+  </div>
+</section>
+
+<!-- ============================================================ 6 -->
+<section class="doc" id="extension">
+  <div class="sec-num">06</div>
+  <h2>The ComfyUI extension</h2>
+  <p class="lede">A custom node pack with no compute nodes. It tags a workflow for Unreal and keeps a library on the server, so tagged workflows still run unchanged on Comfy Cloud.</p>
+
+  <div class="mock" role="img" aria-label="Mockup: node context menu and a tagged node in ComfyUI" style="padding:24px">
+    <div style="display:flex;gap:40px;flex-wrap:wrap;align-items:flex-start">
+      <div class="node"><span class="ue">UE</span><div class="hd">Save Image</div><div class="w"><span>images</span><span>IMAGE</span></div><div class="w"><span>filename_prefix</span><span>unreal/texture</span></div></div>
+      <div class="menu">
+        <div>Properties panel</div><div>Bypass</div><hr>
+        <div class="hi">Comfy for Unreal ›</div>
+        <div style="padding-left:22px">Expose input to Unreal…</div>
+        <div style="padding-left:22px" class="hi">Tag output for Unreal…</div>
+        <div style="padding-left:22px">Remove Unreal tags</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="mock dialog" role="img" aria-label="Mockup: Send to Unreal dialog">
+    <div class="bar"><b>Send to Unreal</b><span style="flex:1"></span><span class="dim">✕</span></div>
+    <div style="padding:14px;display:grid;gap:10px">
+      <div style="display:grid;grid-template-columns:96px 1fr;gap:12px"><div class="thumb" style="width:96px;height:96px"><div class="tex"></div></div><div style="display:grid;gap:8px"><div class="field">Mossy stone set</div><div class="field">Texture ▾</div></div></div>
+      <div class="field tall">Tileable stone with a normal and ORM map, tuned for the jam's swamp level.</div>
+      <div class="field">Group: Environment</div>
+      <div class="card"><div class="label">Exposed</div>Surface (prompt) · Seed · Checkpoint<div class="label" style="margin-top:8px">Outputs</div>Albedo → Base Color · Normal → Normal · ORM → ORM</div>
+      <div style="display:flex;gap:8px;justify-content:flex-end"><span class="btn ghost">Cancel</span><span class="btn primary">Send</span></div>
+    </div>
+  </div>
+
+  <h3 id="remix">How it mirrors RTX Remix 1.6</h3>
+  <div class="tbl"><table>
+    <thead><tr><th>RTX Remix</th><th>Comfy for Unreal</th></tr></thead>
+    <tbody>
+      <tr><td>Right-click › Tag for RTX Remix</td><td>Right-click › Comfy for Unreal › Expose input, Tag output</td></tr>
+      <tr><td>Export Workflow for RTX Remix: name, type, description, group, texture type per output</td><td>Send to Unreal: name, type, description, group, thumbnail; texture slot per output</td></tr>
+      <tr><td>Exports in the server's user folder, listed by the Toolkit as User and Built-in</td><td><code>user/default/comfy-unreal/workflows</code>, listed in Studio under Server next to Project and Built-in</td></tr>
+      <tr><td>Fixed workflow types</td><td>Material, Texture, Sound, Music, Mesh, Upscale, Other</td></tr>
+      <tr><td>Inputs from the current selection, one job per item</td><td>Input sources: Prompt, selected textures or meshes, viewport capture <span class="chip partial">one item per run today</span></td></tr>
+      <tr><td>Apply, Decline, Reapply, Revert</td><td>Import, Replace on selection, Revert</td></tr>
+      <tr><td>Download Model node fetches weights on first run</td><td><span class="chip todo">to build</span></td></tr>
+      <tr><td>Local-first, one ComfyUI URL</td><td>Also Comfy Cloud, API deployments and Router, so a laptop is enough</td></tr>
+      <tr><td>Extension installed in the user's ComfyUI</td><td>On Cloud, which loads no custom nodes, Studio could inject the extension's frontend script into the page <span class="chip todo">proposed</span></td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<!-- ============================================================ 7 -->
+<section class="doc" id="workflows">
+  <div class="sec-num">07</div>
+  <h2>Workflows and the manifest</h2>
+  <p class="lede">A Comfy Workflow asset is the API graph plus a manifest. The manifest drives the form, the Blueprint node and the agent schema.</p>
+  <p>The manifest lives in <code>workflow.extra.comfy_unreal</code> and is specified in <code>docs/MANIFEST.md</code> in both repositories. Precedence when a graph comes in: the manifest, then ComfyUI App mode's chosen inputs (<code>extra.linearData</code>), then the plugin's own detection.</p>
+  <div class="tbl"><table>
+    <thead><tr><th>Output kind and slot</th><th>Becomes</th><th>Import settings</th></tr></thead>
+    <tbody>
+      <tr><td>Texture: Base Color, Emissive; Image</td><td>Texture2D</td><td>sRGB, default compression</td></tr>
+      <tr><td>Texture: Normal</td><td>Texture2D</td><td>Linear, normal-map compression</td></tr>
+      <tr><td>Texture: Roughness, Metallic, AO, Height, ORM, Opacity</td><td>Texture2D</td><td>Linear, masks compression</td></tr>
+      <tr><td>Sound, Music</td><td>Sound Wave</td><td>Editor import (FLAC and WAV)</td></tr>
+      <tr><td>Mesh</td><td>Static Mesh</td><td>GLB through Interchange</td></tr>
+    </tbody>
+  </table></div>
+  <h3 id="model-inputs">Model inputs that travel</h3>
+  <p>Model files differ between machines and Cloud. A <code>Model</code> input lists what the connected backend has and picks the first match from the workflow's <code>prefer</code> list (exact name first, then substring). That fixed a real failure on the test PC, where <code>ae.safetensors</code> turned out to be an SDXL VAE.</p>
+  <h3 id="built-ins">Built-in workflows</h3>
+  <div class="tbl"><table>
+    <thead><tr><th>Workflow</th><th>Type</th><th>Runs on</th><th>State</th></tr></thead>
+    <tbody>
+      <tr><td>Seamless Texture (Cloud)</td><td>Texture</td><td>Cloud, any install with a Flux fp8 checkpoint</td><td><span class="chip partial">untested on Cloud</span></td></tr>
+      <tr><td>Seamless Texture (Flux Dev GGUF)</td><td>Texture</td><td>Local, 12-16 GB GPU</td><td><span class="chip built">ran locally</span></td></tr>
+      <tr><td>Seamless Texture (Flux Schnell)</td><td>Texture</td><td>Local with the fp8 checkpoint</td><td><span class="chip partial">untested</span></td></tr>
+      <tr><td>Sound Effect (Stable Audio Open)</td><td>Sound</td><td>Local, Cloud</td><td><span class="chip partial">models not on test PC</span></td></tr>
+      <tr><td>Image to Mesh (Hunyuan3D 2)</td><td>Mesh</td><td>Local, about 12 GB</td><td><span class="chip partial">models not on test PC</span></td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<!-- ============================================================ 8 -->
+<section class="doc" id="backends">
+  <div class="sec-num">08</div>
+  <h2>Backends</h2>
+  <p class="lede">Named profiles in Project Settings, one active per user. Keys never live in project config.</p>
+  <div class="tbl"><table>
+    <thead><tr><th>Kind</th><th>Protocol</th><th>Graph view</th><th>Extension library</th><th>Cost</th></tr></thead>
+    <tbody>
+      <tr><td class="k">Comfy Desktop, local install</td><td>Native routes (<code>/prompt</code>, <code>/history</code>, <code>/view</code>, <code>/ws</code>)</td><td>Yes</td><td>Yes</td><td>Free, uses your GPU</td></tr>
+      <tr><td class="k">Comfy Cloud</td><td>Comfy API v2</td><td>Yes, cloud.comfy.org</td><td>No (no custom nodes)</td><td>Credits</td></tr>
+      <tr><td class="k">API deployment</td><td>Comfy API v2, built with <code>comfy build</code> and <code>comfy deploy</code></td><td>No</td><td>No</td><td>Credits, billed while running</td></tr>
+      <tr><td class="k">Comfy Router</td><td>Single partner-model calls</td><td>No</td><td>No</td><td>Credits</td></tr>
+    </tbody>
+  </table></div>
+  <p class="small muted">API keys are read from the profile's environment variable (<code>COMFY_API_KEY</code>), then <code>COMFY_CLOUD_API_KEY</code> (comfy-cli's), then Editor Preferences. Cloud and Router use <code>Authorization: Bearer</code>, the same as Comfy's own SDK.</p>
+
+  <h3 id="cloud-sign-in">Signing in to Comfy Cloud</h3>
+  <p>The first Cloud test showed a gap. With no key, the Graph view opened Comfy's sign-in. After sign-in the page was ready to run, with 5 free runs, but Run in Studio still refused because it only knew about API keys. Users should not have to sign in and also make a key.</p>
+  <p><b>Proposal: run Cloud jobs through the signed-in page.</b> The ComfyUI frontend exposes its API client as <code>window.comfyAPI</code>. Every call it makes, including <code>queuePrompt</code>, goes through <code>api.fetchApi</code>, which carries the page's Cloud session and refreshes it when it expires (<code>fetchWithUnifiedRemint</code> in frontend 1.53). Studio already has a two-way bridge into the page (<code>window.ue.comfyunreal</code>). So for a signed-in Cloud backend, Studio:</p>
+  <ol>
+    <li>keeps the Graph page loaded, even while the Run view is showing;</li>
+    <li>uploads inputs by calling <code>/upload/image</code> from inside the page;</li>
+    <li>calls <code>queuePrompt</code> in the page with the API graph and the UI workflow;</li>
+    <li>listens to the page's <code>progress</code>, <code>executed</code> and <code>execution_error</code> events and forwards them to the job;</li>
+    <li>fetches each output in the page and hands the bytes to Unreal through the bridge, which imports them as usual.</li>
+  </ol>
+  <p>The session token never leaves the page. Unreal doesn't store it, so there's nothing to leak in project files or logs. Signing out in the page signs Studio out too.</p>
+  <div class="tbl"><table>
+    <thead><tr><th></th><th>Sign in (page bridge)</th><th>API key</th></tr></thead>
+    <tbody>
+      <tr><td class="k">For</td><td>People using Studio</td><td>Agents, Python, Blueprint at runtime, build machines, API deployments</td></tr>
+      <tr><td class="k">Setup</td><td>Click, sign in, done</td><td>Make a key on platform.comfy.org, paste it in Settings or set <code>COMFY_API_KEY</code>, restart the editor if using the variable</td></tr>
+      <tr><td class="k">Needs</td><td>The embedded browser and the Graph page loaded</td><td>Nothing but HTTP</td></tr>
+      <tr><td class="k">Risks</td><td>Depends on frontend internals (<code>comfyAPI</code>, event names); must be checked against each Cloud frontend release</td><td>Keys on disk or in env; user has to manage them</td></tr>
+    </tbody>
+  </table></div>
+  <p>Both stay. Studio uses the key if it has one and falls back to the signed-in page otherwise. The status line names which one is in use: <i>Signed in · Joshua</i> or <i>API key · ends 4f2a</i>.</p>
+  <h4 id="api-key-steps">When a key is needed: the walkthrough</h4>
+  <p>Settings › Comfy Cloud shows these steps inline, with buttons rather than instructions:</p>
+  <ol class="steps">
+    <li><b>Open the key page.</b> A button opens <code>platform.comfy.org</code> to the API keys page, inside the same signed-in browser so there's no second login.</li>
+    <li><b>Create a key</b> named after the machine, for example "Unreal · studio-pc".</li>
+    <li><b>Paste it</b> into a password field in Settings. It is stored in the user's Editor Preferences, never in the project. A <b>Test</b> button checks it and shows the account it belongs to.</li>
+    <li><b>Or use a variable</b> for shared or build machines: <code>COMFY_API_KEY</code>, read when the editor starts.</li>
+  </ol>
+  <div class="callout warn"><p><b>Ask Comfy Cloud first.</b> The page bridge uses the frontend the way a person does, but programmatically. Confirm with the Cloud team that it fits their terms and rate limits, and whether a supported route is coming, for example an OAuth or device-code sign-in that gives Unreal its own token.</p></div>
+</section>
+
+<!-- ============================================================ 9 -->
+<section class="doc" id="automation">
+  <div class="sec-num">09</div>
+  <h2>Blueprint, Python and agents</h2>
+  <p class="lede">Studio is one client of a public API. Everything it does, a script or an agent can do.</p>
+  <ul>
+    <li><b>Blueprint:</b> the async node <i>Run Comfy Workflow</i> with On Progress, On Completed and On Failed pins; <i>Load Texture From Job</i> and <i>Load Sound From Job</i> for runtime use.</li>
+    <li><b>Python:</b> <code>unreal.get_engine_subsystem(unreal.ComfySubsystem)</code> and <code>unreal.ComfyEditorLibrary</code>, reflected automatically.</li>
+    <li><b>Agents:</b> 18 tools in <code>ComfyAgent.ComfyToolset</code>, including <code>ListWorkflows</code>, <code>DescribeWorkflow</code> (inputs as JSON Schema, model choices as enums), <code>RunWorkflow</code>, <code>WaitForJob</code>, <code>GenerateMaterial</code> and <code>OpenStudio</code>. Results are compact JSON.</li>
+  </ul>
+</section>
+
+<!-- ============================================================ 10 -->
+<section class="doc" id="visual">
+  <div class="sec-num">10</div>
+  <h2>Visual design</h2>
+  <p class="lede">Comfy Studio uses ComfyUI's own design tokens, read from the installed frontend (1.53.10, dark theme), so the two feel like one product.</p>
+  <div class="swatches">
+    <div class="sw"><i style="background:#171718"></i><div>Panel<br><code>charcoal-800 #171718</code></div></div>
+    <div class="sw"><i style="background:#202121"></i><div>Field<br><code>charcoal-700 #202121</code></div></div>
+    <div class="sw"><i style="background:#262729"></i><div>Card, button<br><code>charcoal-600 #262729</code></div></div>
+    <div class="sw"><i style="background:#313235"></i><div>Hover, hairline<br><code>charcoal-400 #313235</code></div></div>
+    <div class="sw"><i style="background:#494a50"></i><div>Border, selected<br><code>charcoal-200 #494a50</code></div></div>
+    <div class="sw"><i style="background:#0b8ce9"></i><div>Primary action<br><code>azure-600 #0b8ce9</code></div></div>
+    <div class="sw"><i style="background:#31b9f4"></i><div>Primary hover<br><code>azure-400 #31b9f4</code></div></div>
+    <div class="sw"><i style="background:#a0a0a0"></i><div>Secondary text<br><code>smoke-700 #a0a0a0</code></div></div>
+    <div class="sw"><i style="background:#f0ff41"></i><div>Comfy brand<br><code>electric-400 #f0ff41</code></div></div>
+  </div>
+  <div class="tbl"><table>
+    <thead><tr><th>Element</th><th>Rule</th></tr></thead>
+    <tbody>
+      <tr><td class="k">Radius</td><td>8 px for cards and buttons (radius-lg), 12 px for drop zones and the preview (radius-xl).</td></tr>
+      <tr><td class="k">Type</td><td>The frontend uses Inter; Slate uses the editor's Roboto, the closest bundled face. Labels are small caps in secondary text, like App mode's.</td></tr>
+      <tr><td class="k">Primary action</td><td>One blue button per view: Run, or Import in the gallery.</td></tr>
+      <tr><td class="k">Logo</td><td>The yellow Comfy mark on the toolbar button, Tools menu, tab and workflow asset thumbnails, from the frontend's <code>comfy-icon-512.png</code>. Use needs confirming with Comfy Org brand.</td></tr>
+      <tr><td class="k">Naming</td><td>"Comfy for Unreal" is the product; "Comfy Studio" is the tab; "Run" and "Graph" are its views.</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<!-- ============================================================ 11 -->
+<section class="doc" id="state">
+  <div class="sec-num">11</div>
+  <h2>Where it stands</h2>
+  <p class="lede">A working proof of concept on UE 5.8, built and tested on one PC between October 22 and 24.</p>
+  <div class="tbl"><table>
+    <thead><tr><th>Area</th><th>State</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td class="k">Plugin build</td><td><span class="chip built">built</span></td><td>Editor and game targets package with RunUAT BuildPlugin, no warnings.</td></tr>
+      <tr><td class="k">Graph view and Send to Unreal</td><td><span class="chip built">tested</span></td><td>A real 18-input workflow sent and run.</td></tr>
+      <tr><td class="k">Local generation</td><td><span class="chip built">tested</span></td><td>Flux Dev GGUF texture on the portable install.</td></tr>
+      <tr><td class="k">New Run view</td><td><span class="chip partial">built, not seen</span></td><td>Compiled; needs an editor restart to screenshot.</td></tr>
+      <tr><td class="k">ComfyUI extension</td><td><span class="chip partial">built, not loaded</span></td><td>Loads on the next ComfyUI restart.</td></tr>
+      <tr><td class="k">Comfy Cloud</td><td><span class="chip partial">signed in, can't run</span></td><td>Sign-in works in the Graph view. Run needs an API key (the old one returns 401) until the page bridge exists.</td></tr>
+      <tr><td class="k">Tests</td><td><span class="chip todo">to build</span></td><td>Mock-backend automation tests.</td></tr>
+    </tbody>
+  </table></div>
+  <figure>
+    <img src="{{img:run-v1.jpg}}" alt="The first Comfy Studio Run view">
+    <figcaption>The first Run view (October 24, morning), before the App-mode redesign. Kept for comparison.</figcaption>
+  </figure>
+  <p class="small muted">Repositories (local, not yet pushed): <code>D:\Comfy\comfy-unreal</code> (plugin, latest <code>350a43d</code>) and <code>D:\Comfy\comfy-for-unreal</code> (extension, <code>66b829a</code>).</p>
+</section>
+
+<!-- ============================================================ 12 -->
+<section class="doc" id="roadmap">
+  <div class="sec-num">12</div>
+  <h2>Roadmap</h2>
+  <div class="tbl"><table>
+    <thead><tr><th>When</th><th>Milestone</th><th>Scope</th></tr></thead>
+    <tbody>
+      <tr><td class="k">Oct 25 – 31</td><td>Verify and polish</td><td>Screenshot and review the Run view; test the extension in ComfyUI; first-run welcome card and Desktop auto-detection; a friendlier Graph empty state; the Cloud page bridge and a first Cloud run from the Run view; the API key walkthrough in Settings.</td></tr>
+      <tr><td class="k">Nov 1 – 7</td><td>Jam-ready content</td><td>Six tagged workflows tested on Desktop and Cloud (material, restyle, sprite, sound variations, music, prop mesh); model checks and download offers; sample project.</td></tr>
+      <tr><td class="k">Nov 8 – 11</td><td>Beta</td><td>GitHub release of plugin and extension; docs and a five-minute video; jam credits for Cloud.</td></tr>
+      <tr><td class="k">Nov 12 on</td><td>The jam</td><td>Support channel, daily fixes, a friction log from entrants.</td></tr>
+      <tr><td class="k">December</td><td>v1.0</td><td>Fab listing, ComfyUI Manager listing, macOS and Linux, Sequencer and Movie Render Queue passes.</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<!-- ============================================================ 13 -->
+<section class="doc" id="questions">
+  <div class="sec-num">13</div>
+  <h2>Open questions</h2>
+  <p class="lede">For the UI review and the UX walkthrough.</p>
+  <ol>
+    <li><b>Auto-import or keep?</b> Should results import automatically (today's default), or only when the user presses Import or Replace? Auto-import fills the Content Browser fast during exploration.</li>
+    <li><b>Where does onboarding live?</b> A welcome card in the empty state, a first-run modal, or a Comfy section in the editor's own startup?</li>
+    <li><b>Cloud sign-in vs. API key.</b> Technically yes, through the <a href="#cloud-sign-in">page bridge</a>. Open: does the Cloud team bless it, or is a supported sign-in for third-party apps coming?</li>
+    <li><b>The extension on Cloud.</b> Cloud doesn't load custom nodes. Studio could inject the extension's frontend script (tagging, Send to Unreal) into the Cloud page itself and store the library in Cloud's user data. Is that acceptable, and does Cloud keep <code>extra.comfy_unreal</code> when it saves a workflow?</li>
+    <li><b>Graph toolbar.</b> Once the extension is installed, keep Unreal's own Send to Unreal button above the page, or rely on the one inside ComfyUI?</li>
+    <li><b>Batch semantics.</b> Batch count runs N jobs with new seeds. Should "selected textures" run one job per selected asset, like RTX Remix?</li>
+    <li><b>Preview for sound and mesh.</b> A waveform with play, and a turntable, or open the asset editor?</li>
+    <li><b>Brand.</b> Logo usage, the product name, and whether the extension is published by Comfy Org on the registry.</li>
+    <li><b>Desktop port.</b> Comfy Desktop listens on 8000; the plugin defaults to 8188. Detect both, or change the default?</li>
+  </ol>
+</section>
+
+<!-- ============================================================ 14 -->
+<section class="doc" id="decisions">
+  <div class="sec-num">14</div>
+  <h2>Decision log</h2>
+  <div class="tbl"><table>
+    <thead><tr><th>Date</th><th>Decision</th><th>Why</th></tr></thead>
+    <tbody>
+      <tr><td>Oct 22</td><td>Native C++ end to end; Python is a client.</td><td>Same behaviour from Studio, Blueprint, Python and agents.</td></tr>
+      <tr><td>Oct 22</td><td>Register tools with Epic's MCP toolset registry, not our own server.</td><td>Agents are already there in UE 5.8.</td></tr>
+      <tr><td>Oct 24</td><td>Model inputs resolved per backend with prefer lists.</td><td>Hard-coded file names broke on a real PC; Cloud has its own catalog.</td></tr>
+      <tr><td>Oct 24</td><td>Embed the real ComfyUI frontend for graph editing.</td><td>Rebuilding a node editor in Slate would always lag ComfyUI.</td></tr>
+      <tr><td>Oct 24</td><td>Tag workflows in a ComfyUI extension, with no compute nodes.</td><td>Tagged workflows keep running on Cloud and deployments. Same pattern as RTX Remix.</td></tr>
+      <tr><td>Oct 24</td><td>Run view styled after App mode with ComfyUI's tokens.</td><td>It should read as a Comfy product, not an Unreal panel.</td></tr>
+      <tr><td>Oct 24</td><td>Extension licensed GPL-3.0, plugin kept separate.</td><td>The ComfyUI frontend is GPL; the plugin talks to it over HTTP only.</td></tr>
+      <tr><td>Oct 24</td><td><i>Proposed:</i> Cloud runs from Studio go through the signed-in Graph page when there's no API key.</td><td>Sign-in already works in the panel; asking for a key as well is a second setup step most people won't finish.</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<!-- ============================================================ 15 -->
+<section class="doc" id="changelog">
+  <div class="sec-num">15</div>
+  <h2>Changelog</h2>
+  <div class="tbl"><table>
+    <thead><tr><th>Version</th><th>Date</th><th>Changes</th></tr></thead>
+    <tbody>
+      <tr><td>0.1</td><td>2026-10-24</td><td>First version: product shape, seven UX journeys, Studio and extension specs, visual tokens, current state and open questions. Added Cloud sign-in findings and the page-bridge proposal after the first Cloud test.</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+</main>
+</div>
+
+<script>
+// Highlight the contents entry for the section in view.
+(() => {
+  const links = [...document.querySelectorAll('nav.toc a')];
+  const byId = new Map(links.map(a => [a.getAttribute('href').slice(1), a]));
+  const io = new IntersectionObserver(entries => {
+    for (const e of entries) if (e.isIntersecting) {
+      links.forEach(a => a.classList.remove('active'));
+      byId.get(e.target.id)?.classList.add('active');
+    }
+  }, { rootMargin: '-20% 0px -70% 0px' });
+  document.querySelectorAll('section.doc').forEach(s => io.observe(s));
+  links.forEach(a => a.addEventListener('click', () => { const t = document.getElementById('toc-toggle'); if (t) t.checked = false; }));
+})();
+</script>
+</body>
+</html>
