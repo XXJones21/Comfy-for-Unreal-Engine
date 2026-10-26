@@ -305,6 +305,18 @@ The Comfy for Unreal extension for ComfyUI lets a Workflow author choose exactly
 
 {/* PLACEHOLDER: how alpha testers install the ComfyUI extension is not decided. */}
 
+## Use Workflows in Blueprints
+
+The plugin's Blueprint nodes run Workflows while the game runs and load the results as textures and sounds.
+
+- **Run Comfy Workflow** runs a Workflow on the active backend. Right-click in a graph and type `Run` followed by the Workflow's name, such as **Run Seamless Texture**. The node has one pin for each input, the same inputs as the **Run** view. Pins you don't change keep the Workflow's values. **Seed** pins default to `-1`, a new seed every run.
+- **Comfy Inputs** is a variable type that holds a Workflow's inputs. Pick a Workflow in its **Default Value** and the **Details** panel shows that Workflow's inputs as a form. Connect the variable to the node's **Inputs** pin and leave **Workflow** empty.
+- **Load Texture From Job** and **Load Sound From Job** load a result after **On Completed**.
+
+A misspelled input name or a value that doesn't fit the input fails the run, and **On Failed** says which input. The older **Run Comfy Workflow (String Map)** node still takes a map of strings.
+
+For a complete example, see [Tutorial: generate a texture when the player steps on a pad](./tutorial-texture-pad).
+
 ## Troubleshooting
 
 <AccordionGroup>

@@ -9,6 +9,7 @@ You use these parts of the plugin:
 
 - The **Run Seamless Texture** node, which has one pin for each input of the Workflow.
 - **Load Texture From Job**, which loads the result as a texture while the game runs.
+- A **Comfy Inputs** variable, which holds the Workflow's inputs as a form. This is optional, in [Keep the inputs in a variable](#keep-the-inputs-in-a-variable).
 
 <Note>
   The typed **Run Comfy Workflow** node is new in this alpha build. Each step below says what you should see, so you can report anything that's different.
@@ -16,7 +17,7 @@ You use these parts of the plugin:
 
 ## Before you start
 
-- **Use a build that includes the typed node.** The plugin in your project must include the change "Blueprint: typed Run Comfy Workflow node". Close Unreal Editor before you rebuild the plugin.
+- **Use a build that includes the typed node.** The plugin in your project must include the changes "Blueprint: typed Run Comfy Workflow node" and "Comfy Inputs: workflow-aware variable". Close Unreal Editor before you rebuild the plugin.
 - **Connect a backend.** Open **Comfy Studio** and check the status line:
   - **Comfy Cloud:** you're signed in. Each run uses credits.
   - **Comfy Desktop or another local ComfyUI:** the files for **Seamless Texture** are installed: FLUX.2 Klein 4B, the Qwen 3 4B text encoder and the FLUX.2 VAE. The **Run** view tells you if any of them are missing.
