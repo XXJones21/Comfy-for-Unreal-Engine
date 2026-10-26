@@ -34,10 +34,10 @@ public:
 	FComfyAsyncJobPin OnFailed;
 
 	UFUNCTION(BlueprintCallable, Category = "Comfy", meta = (BlueprintInternalUseOnly = "true", WorldContext = "WorldContextObject", AutoCreateRefTerm = "Inputs", DisplayName = "Run Comfy Workflow (String Map)"))
-	static UComfyRunWorkflowAsyncAction* RunComfyWorkflow(UObject* WorldContextObject, UComfyWorkflow* Workflow, const TMap<FString, FString>& Inputs, UPARAM(meta = (ComfyBackend = "true")) FName Backend = NAME_None);
+	static UComfyRunWorkflowAsyncAction* RunComfyWorkflow(UObject* WorldContextObject, UComfyWorkflow* Workflow, const TMap<FString, FString>& Inputs, EComfyBackendTarget Backend = EComfyBackendTarget::Active);
 
 	UFUNCTION(BlueprintCallable, Category = "Comfy|Router", meta = (BlueprintInternalUseOnly = "true", WorldContext = "WorldContextObject", DisplayName = "Run Comfy Router Model"))
-	static UComfyRunWorkflowAsyncAction* RunComfyRouterModel(UObject* WorldContextObject, const FString& ModelId, const FString& RequestJson, UPARAM(meta = (ComfyBackend = "true")) FName Backend = NAME_None);
+	static UComfyRunWorkflowAsyncAction* RunComfyRouterModel(UObject* WorldContextObject, const FString& ModelId, const FString& RequestJson, EComfyBackendTarget Backend = EComfyBackendTarget::Active);
 
 	virtual void Activate() override;
 
@@ -56,7 +56,7 @@ protected:
 	TMap<FString, FString> Inputs;
 	FString ModelId;
 	FString RequestJson;
-	FName Backend;
+	EComfyBackendTarget Backend = EComfyBackendTarget::Active;
 
 	UPROPERTY()
 	TObjectPtr<UComfyJob> Job;
@@ -73,7 +73,7 @@ class COMFYCORE_API UComfyRunWorkflowWithInputsAction : public UComfyRunWorkflow
 
 public:
 	UFUNCTION(BlueprintCallable, Category = "Comfy", meta = (BlueprintInternalUseOnly = "true", WorldContext = "WorldContextObject", AutoCreateRefTerm = "Inputs", DisplayName = "Run Comfy Workflow"))
-	static UComfyRunWorkflowWithInputsAction* RunComfyWorkflowWithInputs(UObject* WorldContextObject, UComfyWorkflow* Workflow, const FComfyInputs& Inputs, UPARAM(meta = (ComfyBackend = "true")) FName Backend = NAME_None);
+	static UComfyRunWorkflowWithInputsAction* RunComfyWorkflowWithInputs(UObject* WorldContextObject, UComfyWorkflow* Workflow, const FComfyInputs& Inputs, EComfyBackendTarget Backend = EComfyBackendTarget::Active);
 
 protected:
 	virtual UComfyJob* StartJob(UComfySubsystem* Comfy) override;

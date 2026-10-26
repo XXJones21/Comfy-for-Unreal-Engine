@@ -1260,6 +1260,54 @@ void UComfySubsystem::RouterCollect(UComfyJob* Job, FComfyBackendProfile Profile
 	}, 120.f);
 }
 
+FName UComfySubsystem::GetBackendForTarget(EComfyBackendTarget Target) const
+{
+	EComfyBackendKind Kind;
+	switch (Target)
+	{
+	case EComfyBackendTarget::Desktop: Kind = EComfyBackendKind::Local; break;
+	case EComfyBackendTarget::Cloud: Kind = EComfyBackendKind::Cloud; break;
+	case EComfyBackendTarget::Router: Kind = EComfyBackendKind::Router; break;
+	default: return NAME_None;
+	}
+
+	FComfyBackendProfile Profile;
+	const FName Active = GetActiveBackend();
+	if (GetBackendProfile(Active, Profile) && Profile.Kind == Kind)
+	{
+		return Active;
+	}
+	const UComfySettings* Settings = GetDefault<UComfySettings>();
+	if (GetBackendProfile(Settings->DefaultBackend, Profile) && Profile.Kind == Kind)
+	{
+		return Settings->DefaultBackend;
+	}
+	for (const FComfyBackendProfile& Candidate : Settings->Backends)
+	{
+		if (Candidate.Kind == Kind)
+		{
+			return Candidate.Name;
+		}
+	}
+	return FName(*FString::Printf(TEXT("%s (none set up in Comfy settings)"), *StaticEnum<EComfyBackendTarget>()->GetDisplayNameTextByValue(static_cast<int64>(Target)).ToString()));
+}
+
+EComfyBackendTarget UComfySubsystem::GetTargetForBackend(FName Backend)
+{
+	const FComfyBackendProfile* Profile = Backend.IsNone() ? nullptr : GetDefault<UComfySettings>()->FindBackend(Backend);
+	if (!Profile)
+	{
+		return EComfyBackendTarget::Active;
+	}
+	switch (Profile->Kind)
+	{
+	case EComfyBackendKind::Local: return EComfyBackendTarget::Desktop;
+	case EComfyBackendKind::Cloud: return EComfyBackendTarget::Cloud;
+	case EComfyBackendKind::Router: return EComfyBackendTarget::Router;
+	default: return EComfyBackendTarget::Active;
+	}
+}
+
 bool UComfySubsystem::FindRouterProfile(FName Backend, FComfyBackendProfile& OutProfile) const
 {
 	FName Name = Backend;

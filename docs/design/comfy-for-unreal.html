@@ -734,7 +734,7 @@ svg.diagram{width:100%;height:auto;display:block}
       <div class="w"><span>Surface: weathered red brick</span><span>On Failed ▷</span></div>
       <div class="w"><span>Seed: -1</span><span>Job ●</span></div>
       <div class="w"><span>Width: 1024 · Height: 1024</span><span></span></div>
-      <div class="w"><span>Backend: None</span><span></span></div>
+      <div class="w"><span>Backend: Active backend</span><span></span></div>
       <div class="w"><span class="dim">▾ Model files (Auto) · Inputs</span><span></span></div>
     </div>
   </div>
@@ -775,7 +775,7 @@ svg.diagram{width:100%;height:auto;display:block}
     <thead><tr><th>Step</th><th>Nodes</th><th>Notes</th></tr></thead>
     <tbody>
       <tr><td class="k">1. Pick a workflow</td><td>A Comfy Workflow asset reference; <i>Get Built In Workflows</i>; <i>Find Workflow</i> (editor); <i>Create Transient From Json</i></td><td>Assets come from importing an <code>Export (API)</code> JSON or from <b>Send to Unreal</b>. Built-ins are the six starters, loaded as transient assets.</td></tr>
-      <tr><td class="k">2. Run it</td><td><i>Run Comfy Workflow</i> (async): Workflow, one pin per input, Inputs, Backend. Pins: On Progress (repeats), On Completed, On Failed (once each), each passing the Comfy Job.</td><td>See <a href="#blueprint">How the node works</a>. Backend None uses the active backend. On Completed fires after every output has downloaded. Also: <i>Run Comfy Workflow (String Map)</i>, the older node with a <code>Map&lt;String, String&gt;</code>; <i>Run Comfy Router Model</i> (same pins, spends credits); and <i>Run Workflow</i> / <i>Run Workflow With Inputs</i> on the subsystem, which return the job with bindable On Completed and On Failed events.</td></tr>
+      <tr><td class="k">2. Run it</td><td><i>Run Comfy Workflow</i> (async): Workflow, one pin per input, Inputs, Backend. Pins: On Progress (repeats), On Completed, On Failed (once each), each passing the Comfy Job.</td><td>See <a href="#blueprint">How the node works</a>. Backend is a choice: <b>Active backend</b> (the one selected in Studio), <b>Desktop</b> (any local ComfyUI server, portable included), <b>Comfy Cloud</b> or <b>Comfy Router</b>. Each uses the profile of that kind set up in Comfy settings. On Completed fires after every output has downloaded. Also: <i>Run Comfy Workflow (String Map)</i>, the older node with a <code>Map&lt;String, String&gt;</code>; <i>Run Comfy Router Model</i> (same pins, spends credits); and <i>Run Workflow</i> / <i>Run Workflow With Inputs</i> on the subsystem, which return the job with bindable On Completed and On Failed events.</td></tr>
       <tr><td class="k">3a. Use it in game</td><td><i>Load Texture From Job</i>, <i>Load Sound From Job</i>, <i>Load Texture From File</i>, <i>Load Sound From File</i>, <i>Make Tileable</i>, <i>Make Normal Map</i>, <i>New Comfy Seed</i></td><td><code>Comfy|Runtime</code>, no editor needed. Textures and sounds are transient. Empty output name takes the first of its kind; sRGB off for normal maps.</td></tr>
       <tr><td class="k">3b. Read the job</td><td><i>Get Output</i>, <i>Get Outputs Of Kind</i>, <i>Get Output Directory</i>, <i>Succeeded</i>, <i>Get State Text</i>, <i>Cancel</i></td><td></td></tr>
       <tr><td class="k">3c. Use it in the editor</td><td><i>Import Job Outputs</i>, <i>Create Material From Job</i>, <i>Assign Material To Selected Actors</i>, <i>Export Asset For Input</i>, <i>Capture Active Viewport</i>, <i>Get Provenance</i>, <i>Open Studio</i></td><td><code>Comfy|Editor</code>, for Editor Utility Blueprints. Imported assets record the job that made them; assigning a material can be undone.</td></tr>
@@ -975,6 +975,7 @@ svg.diagram{width:100%;height:auto;display:block}
       <tr><td>Oct 25</td><td>The Blueprint node grows a typed pin per workflow input; pins at their defaults aren't sent.</td><td>The same inputs as the Run view, checked by the compiler; workflow defaults and per-backend model choice keep working.</td></tr>
       <tr><td>Oct 25</td><td>Starters are saved as plugin assets by the editor, generated from the JSON.</td><td>Blueprints can only reference real assets, and a game only cooks what's referenced.</td></tr>
       <tr><td>Oct 25</td><td>Comfy Inputs names its workflow and gets a Details form, instead of a generated struct or node per workflow.</td><td>One variable type covers every workflow, nothing goes stale when a workflow changes, and the generic node stays the one way to run.</td></tr>
+      <tr><td>Oct 25</td><td>The node's Backend pin is a choice of Active backend, Desktop, Comfy Cloud or Comfy Router, not a profile name.</td><td>There are three kinds of backend; how each connects is set up once in Comfy settings, not in every Blueprint.</td></tr>
       <tr><td>Oct 25</td><td>Comfy Inputs seeds left out get a new seed each run.</td><td>The same as the node's Seed pins; a game usually wants a new image each time. Set a seed to fix it.</td></tr>
     </tbody>
   </table></div>
@@ -987,7 +988,7 @@ svg.diagram{width:100%;height:auto;display:block}
   <div class="tbl"><table>
     <thead><tr><th>Version</th><th>Date</th><th>Changes</th></tr></thead>
     <tbody>
-      <tr><td>0.3.3</td><td>2026-10-25</td><td>Blueprint: Comfy Inputs as a workflow-aware variable with a Details form; the node runs the inputs' workflow when its pin is empty.</td></tr>
+      <tr><td>0.3.3</td><td>2026-10-25</td><td>Blueprint: Comfy Inputs as a workflow-aware variable with a Details form; the node runs the inputs' workflow when its pin is empty; Backend is a choice of Active backend, Desktop, Comfy Cloud or Comfy Router.</td></tr>
       <tr><td>0.3.2</td><td>2026-10-25</td><td>Blueprint: the typed Run Comfy Workflow node, Comfy Inputs, and the starters as assets.</td></tr>
       <tr><td>0.3.1</td><td>2026-10-25</td><td>Why the extension never loaded, and how it gets installed on Desktop, for testers and on Cloud. Blueprint walkthrough and gaps; corrected the claim that the manifest drives the Blueprint node.</td></tr>
       <tr><td>0.3</td><td>2026-10-25</td><td>Six starter workflows replace the built-ins, with presets, a missing-model message and download, and Play and Open mesh previews. New section: Path to alpha, with the must-have, should-have and later work and the decisions needed. Roadmap, open questions and decision log updated. Get-started page and README drafted.</td></tr>

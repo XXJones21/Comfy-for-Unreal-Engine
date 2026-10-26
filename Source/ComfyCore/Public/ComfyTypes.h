@@ -22,6 +22,23 @@ enum class EComfyBackendKind : uint8
 	Router,
 };
 
+/**
+ * Which backend a Blueprint node runs on. Each choice uses the profile of that kind set up in Comfy settings:
+ * the active one if it's that kind, else the default backend if it is, else the first in the list.
+ */
+UENUM(BlueprintType)
+enum class EComfyBackendTarget : uint8
+{
+	/** Whichever backend is selected in Comfy Studio. */
+	Active UMETA(DisplayName = "Active backend"),
+	/** A ComfyUI server on this machine or your network: Comfy Desktop, portable ComfyUI or another install. */
+	Desktop UMETA(DisplayName = "Desktop"),
+	/** Comfy Cloud. */
+	Cloud UMETA(DisplayName = "Comfy Cloud"),
+	/** Comfy Router: partner models through the Comfy API. */
+	Router UMETA(DisplayName = "Comfy Router"),
+};
+
 /** Wire protocol a Local profile speaks. */
 UENUM(BlueprintType)
 enum class EComfyLocalProtocol : uint8

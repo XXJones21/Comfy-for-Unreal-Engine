@@ -359,6 +359,21 @@ void UK2Node_RunComfyWorkflow::PinConnectionListChanged(UEdGraphPin* Pin)
 	}
 }
 
+void UK2Node_RunComfyWorkflow::PostReconstructNode()
+{
+	Super::PostReconstructNode();
+
+	// The Backend pin took a profile name before it was a choice; map "Comfy Cloud" and the like onto the new values.
+	UEdGraphPin* BackendPin = FindPin(TEXT("Backend"));
+	const UEnum* Enum = StaticEnum<EComfyBackendTarget>();
+	if (BackendPin && BackendPin->PinType.PinSubCategoryObject == Enum && BackendPin->LinkedTo.Num() == 0
+		&& Enum->GetIndexByNameString(BackendPin->DefaultValue) == INDEX_NONE)
+	{
+		const EComfyBackendTarget Target = UComfySubsystem::GetTargetForBackend(FName(*BackendPin->DefaultValue));
+		BackendPin->DefaultValue = Enum->GetNameStringByValue(static_cast<int64>(Target));
+	}
+}
+
 void UK2Node_RunComfyWorkflow::GetPinHoverText(const UEdGraphPin& Pin, FString& HoverTextOut) const
 {
 	const FComfyWorkflowInput* Input = FindInputForPin(&Pin);

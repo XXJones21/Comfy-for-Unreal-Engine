@@ -88,6 +88,17 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Comfy|Backends")
 	bool GetBackendProfile(UPARAM(meta = (ComfyBackend = "true")) FName Backend, FComfyBackendProfile& OutProfile) const;
 
+	/**
+	 * The profile a Backend choice on the Blueprint nodes runs on: None for Active backend, otherwise the active profile
+	 * if it's that kind, else the default backend if it is, else the first profile of that kind. When none is set up,
+	 * a name no profile has, so the run fails and says so.
+	 */
+	UFUNCTION(BlueprintPure, Category = "Comfy|Backends")
+	FName GetBackendForTarget(EComfyBackendTarget Target) const;
+
+	/** The Backend choice for a profile name, for pins that held a name before the choice existed. Active for none or an unknown name. */
+	static EComfyBackendTarget GetTargetForBackend(FName Backend);
+
 	/** The backend used when a run doesn't name one. */
 	UFUNCTION(BlueprintPure, Category = "Comfy|Backends")
 	FName GetActiveBackend() const;

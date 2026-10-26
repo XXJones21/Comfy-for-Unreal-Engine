@@ -5,7 +5,7 @@
 #include "ComfySubsystem.h"
 #include "ComfyCoreModule.h"
 
-UComfyRunWorkflowAsyncAction* UComfyRunWorkflowAsyncAction::RunComfyWorkflow(UObject* WorldContextObject, UComfyWorkflow* InWorkflow, const TMap<FString, FString>& InInputs, FName InBackend)
+UComfyRunWorkflowAsyncAction* UComfyRunWorkflowAsyncAction::RunComfyWorkflow(UObject* WorldContextObject, UComfyWorkflow* InWorkflow, const TMap<FString, FString>& InInputs, EComfyBackendTarget InBackend)
 {
 	UComfyRunWorkflowAsyncAction* Action = NewObject<UComfyRunWorkflowAsyncAction>();
 	Action->WorkflowToRun = InWorkflow;
@@ -15,7 +15,7 @@ UComfyRunWorkflowAsyncAction* UComfyRunWorkflowAsyncAction::RunComfyWorkflow(UOb
 	return Action;
 }
 
-UComfyRunWorkflowAsyncAction* UComfyRunWorkflowAsyncAction::RunComfyRouterModel(UObject* WorldContextObject, const FString& InModelId, const FString& InRequestJson, FName InBackend)
+UComfyRunWorkflowAsyncAction* UComfyRunWorkflowAsyncAction::RunComfyRouterModel(UObject* WorldContextObject, const FString& InModelId, const FString& InRequestJson, EComfyBackendTarget InBackend)
 {
 	UComfyRunWorkflowAsyncAction* Action = NewObject<UComfyRunWorkflowAsyncAction>();
 	Action->ModelId = InModelId;
@@ -58,9 +58,10 @@ void UComfyRunWorkflowAsyncAction::Activate()
 
 UComfyJob* UComfyRunWorkflowAsyncAction::StartJob(UComfySubsystem* Comfy)
 {
+	const FName BackendName = Comfy->GetBackendForTarget(Backend);
 	return ModelId.IsEmpty()
-		? Comfy->RunWorkflow(WorkflowToRun, Inputs, Backend)
-		: Comfy->RunRouterModel(ModelId, RequestJson, Backend);
+		? Comfy->RunWorkflow(WorkflowToRun, Inputs, BackendName)
+		: Comfy->RunRouterModel(ModelId, RequestJson, BackendName);
 }
 
 void UComfyRunWorkflowAsyncAction::HandleProgress(UComfyJob* InJob)
@@ -87,7 +88,7 @@ void UComfyRunWorkflowAsyncAction::HandleFinished(UComfyJob* InJob)
 	SetReadyToDestroy();
 }
 
-UComfyRunWorkflowWithInputsAction* UComfyRunWorkflowWithInputsAction::RunComfyWorkflowWithInputs(UObject* WorldContextObject, UComfyWorkflow* InWorkflow, const FComfyInputs& InInputs, FName InBackend)
+UComfyRunWorkflowWithInputsAction* UComfyRunWorkflowWithInputsAction::RunComfyWorkflowWithInputs(UObject* WorldContextObject, UComfyWorkflow* InWorkflow, const FComfyInputs& InInputs, EComfyBackendTarget InBackend)
 {
 	UComfyRunWorkflowWithInputsAction* Action = NewObject<UComfyRunWorkflowWithInputsAction>();
 	Action->WorkflowToRun = InWorkflow;
@@ -99,5 +100,5 @@ UComfyRunWorkflowWithInputsAction* UComfyRunWorkflowWithInputsAction::RunComfyWo
 
 UComfyJob* UComfyRunWorkflowWithInputsAction::StartJob(UComfySubsystem* Comfy)
 {
-	return Comfy->RunWorkflowWithInputs(WorkflowToRun, TypedInputs, Backend);
+	return Comfy->RunWorkflowWithInputs(WorkflowToRun, TypedInputs, Comfy->GetBackendForTarget(Backend));
 }
