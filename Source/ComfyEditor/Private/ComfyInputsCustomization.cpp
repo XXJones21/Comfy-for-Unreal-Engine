@@ -110,28 +110,21 @@ void FComfyInputsCustomization::Edit(const FText& Description, TFunctionRef<void
 	{
 		return;
 	}
-	const FScopedTransaction Transaction(Description);
-	TArray<UObject*> Outers;
-	StructHandle->GetOuterObjects(Outers);
-	for (UObject* Outer : Outers)
-	{
-		if (Outer)
-		{
-			Outer->Modify();
-		}
-	}
-	StructHandle->NotifyPreChange();
-	TArray<void*> Raw;
+	// Go through the handle as text, not the raw struct: that path records undo and, on a Blueprint default, carries the
+	// change to placed actors that still had the old value.
+	TArray<const void*> Raw;
 	StructHandle->AccessRawData(Raw);
-	for (void* Data : Raw)
+	TArray<FString> PerObject;
+	for (const void* Data : Raw)
 	{
-		if (Data)
-		{
-			Change(*static_cast<FComfyInputs*>(Data));
-		}
+		FComfyInputs Inputs = Data ? *static_cast<const FComfyInputs*>(Data) : FComfyInputs();
+		Change(Inputs);
+		FString Text;
+		FComfyInputs::StaticStruct()->ExportText(Text, &Inputs, nullptr, nullptr, PPF_None, nullptr);
+		PerObject.Add(MoveTemp(Text));
 	}
-	StructHandle->NotifyPostChange(EPropertyChangeType::ValueSet);
-	StructHandle->NotifyFinishedChangingProperties();
+	const FScopedTransaction Transaction(Description);
+	StructHandle->SetPerObjectValues(PerObject);
 }
 
 void FComfyInputsCustomization::SetValue(const FString& Name, const FString& Value)
