@@ -1,0 +1,212 @@
+---
+title: "Tutorial: generate a texture when the player steps on a pad"
+description: "Build an actor that runs a Comfy Workflow when the player steps into a trigger box, and puts the generated texture on a cube while the game runs."
+---
+
+In this tutorial you build one Blueprint actor with a cube and a trigger box. When the player steps into the box, the actor runs the **Seamless Texture** Workflow with a random surface description and a new seed. When the result arrives, the cube shows the new texture. Each step on the pad gives a different texture.
+
+You use these parts of the plugin:
+
+- The **Run Seamless Texture** node, which has one pin for each input of the Workflow.
+- **Load Texture From Job**, which loads the result as a texture while the game runs.
+
+<Note>
+  The typed **Run Comfy Workflow** node is new in this alpha build. Each step below says what you should see, so you can report anything that's different.
+</Note>
+
+## Before you start
+
+- **Use a build that includes the typed node.** The plugin in your project must include the change "Blueprint: typed Run Comfy Workflow node". Close Unreal Editor before you rebuild the plugin.
+- **Connect a backend.** Open **Comfy Studio** and check the status line:
+  - **Comfy Cloud:** you're signed in. Each run uses credits.
+  - **Comfy Desktop or another local ComfyUI:** the files for **Seamless Texture** are installed: FLUX.2 Klein 4B, the Qwen 3 4B text encoder and the FLUX.2 VAE. The **Run** view tells you if any of them are missing.
+- **Check that the starters are assets.** In the Content Browser, click **Settings** and turn on **Show Plugin Content**. Open **Plugins > Comfy for Unreal Content > Workflows**.
+
+  **You should see:** six Workflow assets, including `texture_seamless`. The editor saves them the first time it starts with this build.
+
+## Make the material
+
+The cube needs a material with a texture parameter. The Blueprint changes this parameter while the game runs.
+
+<Steps>
+  <Step title="Create the material">
+    In the Content Browser, click **Add > Material** and name it `M_ComfyCube`. Double-click the material to open it.
+  </Step>
+  <Step title="Add a texture parameter">
+    Right-click the material graph and add a **TextureSampleParameter2D** node. In the **Details** panel, set **Parameter Name** to `BaseColor`. Any default texture is OK.
+  </Step>
+  <Step title="Connect it and save">
+    Connect the **RGB** output to **Base Color** on the material node. Click **Save**.
+  </Step>
+</Steps>
+
+## Make the actor
+
+<Steps>
+  <Step title="Create the Blueprint">
+    Click **Add > Blueprint Class > Actor** and name it `BP_ComfyPad`. Double-click it to open it.
+  </Step>
+  <Step title="Add the cube">
+    In the **Components** panel, click **Add > Cube**. Name it `Cube`. In the **Details** panel, do these steps:
+
+    1. Set **Location** to `0, 0, 50`.
+    2. Set **Materials > Element 0** to `M_ComfyCube`.
+  </Step>
+  <Step title="Add the trigger box">
+    Click **Add > Box Collision** and name it `Trigger`. Set these values:
+
+    | Setting | Value |
+    | --- | --- |
+    | **Location** | `-250, 0, 20` |
+    | **Box Extent** | `100, 100, 20` |
+
+    The default collision preset, **OverlapAllDynamic**, is correct. **Generate Overlap Events** must be on. It's on by default.
+  </Step>
+  <Step title="Add the variables">
+    In the **My Blueprint** panel, add these variables:
+
+    | Name | Type | Default |
+    | --- | --- | --- |
+    | `Prompts` | **String**, array | Add four to six surfaces, such as `mossy cobblestone path`, `weathered red brick wall`, `rusty corrugated metal`, `cracked desert mud`, `blue ceramic mosaic tiles` and `polished green marble`. Compile once before you can set the defaults. |
+    | `IsGenerating` | **Boolean** | false |
+    | `CubeMaterial` | **Material Instance Dynamic** (object reference) | None |
+  </Step>
+</Steps>
+
+## Build the Event Graph
+
+### 1. Make the cube's material editable
+
+<Steps>
+  <Step title="Create a dynamic material at Begin Play">
+    From **Event BeginPlay**, add **Create Dynamic Material Instance** with **Target** set to `Cube`. Set **Element Index** to `0` and **Source Material** to `M_ComfyCube`.
+  </Step>
+  <Step title="Store it">
+    Connect the return value to **Set CubeMaterial**.
+  </Step>
+</Steps>
+
+### 2. React when the player steps on the pad
+
+<Steps>
+  <Step title="Add the overlap event">
+    Select `Trigger` in the **Components** panel. In the **Details** panel, click **+** next to **On Component Begin Overlap**.
+  </Step>
+  <Step title="Accept the player only">
+    Connect **Other Actor** to **Cast To Character**. Use the cast's success exec pin for the next step.
+  </Step>
+  <Step title="Ignore steps during a run">
+    Add a **Branch**. Connect **NOT IsGenerating** to its **Condition**. From **True**, add **Set IsGenerating** with the value checked.
+
+    A run takes from a few seconds to a minute. This stops one footstep from starting several runs.
+  </Step>
+</Steps>
+
+### 3. Run the Workflow
+
+<Steps>
+  <Step title="Place the node">
+    Drag from the exec output of **Set IsGenerating**. Type `Run Seamless Texture` and select it under **Comfy > Workflows**.
+
+    **You should see:** a node titled **Run Seamless Texture** with these parts:
+
+    - **Inputs:** **Workflow** (already set to `texture_seamless`), **Surface**, **Seed** (`-1`), **Width**, **Height** and **Backend**.
+    - **Outputs:** **On Progress**, **On Completed**, **On Failed** and **Job**.
+
+    Click the arrow at the bottom of the node to show the advanced pins: **Diffusion model**, **Text encoder** and **VAE**, all set to **Auto**, and **Inputs**.
+  </Step>
+  <Step title="Pick a random surface">
+    Get `Prompts`, add **Random Array Item**, and connect its output to **Surface**.
+  </Step>
+  <Step title="Set the size">
+    Set **Width** and **Height** to `512`. A smaller image is faster, and it shows that changed pins are sent.
+  </Step>
+  <Step title="Keep the other defaults">
+    - **Seed:** keep `-1`. You get a new seed each run.
+    - **Backend:** keep **None**. The run uses the active backend from Comfy Studio.
+    - **Models:** keep **Auto**. The backend picks the Workflow's preferred file.
+  </Step>
+</Steps>
+
+### 4. Put the result on the cube
+
+<Steps>
+  <Step title="Load the texture">
+    From **On Completed**, add **Load Texture From Job**. Connect the node's **Job** pin to it. Leave **Output Name** empty to take the first image, and leave **sRGB** checked.
+  </Step>
+  <Step title="Set the parameter">
+    Add **Set Texture Parameter Value**. Set these pins:
+
+    | Pin | Value |
+    | --- | --- |
+    | **Target** | `CubeMaterial` |
+    | **Parameter Name** | `BaseColor` |
+    | **Value** | The texture from **Load Texture From Job** |
+  </Step>
+  <Step title="Allow the next run">
+    After that, add **Set IsGenerating** with the value cleared.
+  </Step>
+</Steps>
+
+### 5. Show failures and progress
+
+<Steps>
+  <Step title="Print failures">
+    From **On Failed**, add **Print String**. Drag from **Job**, get **Error Message**, and connect it to **In String**. After that, add **Set IsGenerating** with the value cleared.
+  </Step>
+  <Step title="Print progress (optional)">
+    From **On Progress**, add **Print String**. Connect **Job > Get State Text** to **In String**. Set **Key** to `ComfyPad` so that each message replaces the one before it.
+  </Step>
+</Steps>
+
+Click **Compile** and **Save**.
+
+**You should see:** no errors or warnings.
+
+{/* SCREENSHOT: /images/comfy-unreal/tutorial-texture-pad-graph.png. Shows the finished BP_ComfyPad Event Graph. Remove the comment markers around the Frame below when the image exists. */}
+{/* <Frame>
+  <img src="/images/comfy-unreal/tutorial-texture-pad-graph.png" alt="The BP_ComfyPad Event Graph, from the overlap event through Run Seamless Texture to Set Texture Parameter Value" />
+</Frame> */}
+
+## Try it
+
+<Steps>
+  <Step title="Place the actor">
+    Drag `BP_ComfyPad` from the Content Browser into the level, near the Player Start.
+  </Step>
+  <Step title="Play">
+    Click **Play** and walk onto the area beside the cube. The trigger box is invisible in the game. Use the `show collision` console command to see it.
+
+    **You should see:**
+
+    1. The progress messages in the upper-left corner.
+    2. The cube shows the new texture when the run is done.
+  </Step>
+  <Step title="Step on it again">
+    Walk off the pad and back on.
+
+    **You should see:** a different texture, because both the surface and the seed changed. If you step on the pad during a run, nothing new starts.
+  </Step>
+</Steps>
+
+## More things to test
+
+These checks use the same Blueprint. Make each change on a copy of the node so that the pad still works.
+
+| Test | What to do | What you should see |
+| --- | --- | --- |
+| Pins follow the Workflow | On a copy of the node, set **Workflow** to `texture_restyle`. | The pins change to that Workflow's inputs: a **Texture** object pin, **Change**, **Size (megapixels)** and **Seed**. **Width** and **Height** go away. |
+| Wired Workflow | Connect a **Comfy Workflow** variable to the **Workflow** pin. | The input pins go away and only **Inputs** stays. |
+| Model choices | Open the **Diffusion model** dropdown with Comfy Desktop as the active backend, and then with Comfy Cloud. | Desktop lists the files that are installed. Cloud lists the Workflow's preferred files. Both start with **Auto**. |
+| Name check | Connect the variable from the previous test to `texture_seamless`. Add **Set Text (Comfy Inputs)** with **Name** set to `promt`, and connect it to **Inputs**. Play and step on the pad. | **On Failed** prints `Seamless Texture has no input named "promt"`, followed by the list of its inputs. |
+| Old node | Place **Run Comfy Workflow (String Map)**. | It looks and works as before. |
+
+## Troubleshooting
+
+| Problem | Try this |
+| --- | --- |
+| **Run Seamless Texture** isn't in the menu | Make sure the Workflow assets are in **Plugins > Comfy for Unreal Content > Workflows**. If they aren't there, check the Output Log for Comfy messages from editor startup. You can also place **Run Comfy Workflow** and set its **Workflow** pin. |
+| Nothing happens on the pad | Make sure you're playing as a Character. Make sure **Generate Overlap Events** is on for `Trigger`. Add a **Print String** right after the overlap event to see if it fires. |
+| The run fails at once | Read the printed error. Usually the backend isn't connected or a model file is missing. Run **Seamless Texture** once from the Comfy Studio **Run** view to check the backend. |
+| The run finishes but the cube doesn't change | Make sure **Parameter Name** is exactly `BaseColor`, the same as in `M_ComfyCube`. Make sure `CubeMaterial` is set at **Begin Play**. |
+| The cube stays at the old texture after one run | `IsGenerating` is still set. Make sure both **On Completed** and **On Failed** clear it. |
