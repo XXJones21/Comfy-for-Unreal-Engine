@@ -664,6 +664,10 @@ UComfyJob* UComfySubsystem::RunWorkflowJson(const FString& ApiGraphJson, const T
 
 UComfyJob* UComfySubsystem::RunWorkflowWithInputs(UComfyWorkflow* Workflow, const FComfyInputs& Inputs, FName Backend)
 {
+	if (!Workflow)
+	{
+		Workflow = Inputs.Workflow;
+	}
 	TMap<FString, FString> Values;
 	FString Error;
 	if (!UComfyInputsLibrary::ResolveComfyInputs(Workflow, Inputs, Values, Error))

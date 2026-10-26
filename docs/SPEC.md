@@ -80,7 +80,7 @@ Open from **Tools > Comfy Studio** or the **Comfy** toolbar button.
 | Function | Returns | Notes |
 | --- | --- | --- |
 | `RunWorkflow(Workflow, Inputs, Backend)` | `UComfyJob*` | Inputs keyed by manifest name; files as absolute paths. Backend None uses the active one. |
-| `RunWorkflowWithInputs(Workflow, ComfyInputs, Backend)` | `UComfyJob*` | Typed inputs (below). Unknown names and values that don't fit fail the job before anything is sent; Seed -1 gets a new seed; assets become files. |
+| `RunWorkflowWithInputs(Workflow, ComfyInputs, Backend)` | `UComfyJob*` | Typed inputs (below). A null Workflow runs `Inputs.Workflow`. Unknown names and values that don't fit fail the job before anything is sent; a Seed of -1, or one left out, gets a new seed; assets become files. |
 | `RunWorkflowJson(ApiGraphJson, Inputs, Backend)` | `UComfyJob*` | No asset needed. |
 | `RunRouterModel(ModelId, RequestJson, Backend)` | `UComfyJob*` | Router call; media URLs in the result become outputs. |
 | `GetRouterModelSchema(ModelId, OnResult)` / `ListRouterModels(Cursor, OnResult)` | async text | OpenAPI document; paged catalog. |
@@ -102,13 +102,15 @@ Functions: `Cancel`, `IsFinished`, `Succeeded`, `GetOutput(Name)`, `GetOutputsOf
 
 ### Blueprint nodes
 
-- **Run Comfy Workflow** (`UK2Node_RunComfyWorkflow`, ComfyBlueprint module): Workflow, one typed pin per workflow input once Workflow is set to an asset, Inputs (`FComfyInputs`, advanced), Backend. Exec pins On Progress, On Completed, On Failed, each passing the job. Pins left at their defaults aren't sent; Seed pins default to -1; Enum and Model pins have dropdowns (Model: installed files on a local backend, preferred files on Cloud and Router; empty means the backend's preferred match). The palette lists one **Run &lt;workflow&gt;** per workflow asset. Compiles to `UComfyInputsLibrary` setters feeding `UComfyRunWorkflowWithInputsAction`.
+- **Run Comfy Workflow** (`UK2Node_RunComfyWorkflow`, ComfyBlueprint module): Workflow, one typed pin per workflow input once Workflow is set to an asset, Inputs (`FComfyInputs`, advanced), Backend. Exec pins On Progress, On Completed, On Failed, each passing the job. With Workflow empty and Inputs connected, it runs the workflow the inputs name. Pins left at their defaults aren't sent; Seed pins default to -1; Enum and Model pins have dropdowns (Model: installed files on a local backend, preferred files on Cloud and Router; empty means the backend's preferred match). The palette lists one **Run &lt;workflow&gt;** per workflow asset. Compiles to `UComfyInputsLibrary` setters feeding `UComfyRunWorkflowWithInputsAction`.
 - **Run Comfy Workflow (String Map)** (`UComfyRunWorkflowAsyncAction`): Workflow, `Map<String, String>` Inputs, Backend, same exec pins. Unknown keys are ignored.
 - **Run Comfy Router Model** (ModelId, RequestJson, Backend), same pins.
 
 ### `FComfyInputs` and `UComfyInputsLibrary` (runtime-safe)
 
-`FComfyInputs` holds `Values` (name to text) and `Assets` (name to object, for File inputs). Pure setters return the inputs with one value added: `SetComfyText`, `SetComfyInt`, `SetComfyFloat`, `SetComfyBool`, `SetComfySeed` (-1 for a new seed each run), `SetComfyFile`, `SetComfyTexture`, `SetComfyAsset`. Also `MakeComfyInputsFromMap` (autocast from a string map), `GetComfyInputNames(Workflow)`, `ValidateComfyInputs(Workflow, Inputs, OutError)`.
+`FComfyInputs` holds `Workflow` (the workflow the inputs are for), `Values` (name to text) and `Assets` (name to object, for File inputs). Pure setters return the inputs with one value added: `SetComfyText`, `SetComfyInt`, `SetComfyFloat`, `SetComfyBool`, `SetComfySeed` (-1 for a new seed each run), `SetComfyFile`, `SetComfyTexture`, `SetComfyAsset`; `ClearComfyInput` removes one. Also `GetComfyInput(Inputs, Name, OutValue)`, `GetComfyInputChoices(Workflow, Name)` (Choice options; Model files as the node's dropdown lists them), `MakeComfyInputsFromMap` (autocast from a string map), `GetComfyInputNames(Workflow)`, `ValidateComfyInputs(Workflow, Inputs, OutError)` (null Workflow checks against `Inputs.Workflow`). Inputs left out keep the workflow's value, except Seed inputs, which get a new seed each run.
+
+In the editor, `FComfyInputsCustomization` (ComfyEditor) shows a Comfy Inputs property with a workflow as one row per input: text boxes, number fields, a checkbox, dropdowns for Choice and Model, and a texture picker for image File inputs. A row left empty isn't stored; the reset arrow clears one. Names the workflow doesn't have are listed with a Remove button. The raw maps are under **Values as text**.
 
 ### `UComfyRuntimeLibrary` (runtime-safe)
 

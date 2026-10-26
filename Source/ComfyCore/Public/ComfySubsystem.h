@@ -48,8 +48,9 @@ public:
 
 	/**
 	 * Run a workflow asset with typed inputs (see Comfy|Inputs). Unlike RunWorkflow, every name must be one of the
-	 * workflow's inputs and every value must fit its type, or the job fails before anything is sent. A Seed of -1
-	 * gets a new seed, and assets are written to files for File inputs.
+	 * workflow's inputs and every value must fit its type, or the job fails before anything is sent. A Seed of -1,
+	 * or one left out, gets a new seed, and assets are written to files for File inputs. A null Workflow runs the
+	 * one the inputs name.
 	 */
 	UFUNCTION(BlueprintCallable, Category = "Comfy")
 	UComfyJob* RunWorkflowWithInputs(UComfyWorkflow* Workflow, const FComfyInputs& Inputs, FName Backend = NAME_None);

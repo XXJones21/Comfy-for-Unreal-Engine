@@ -2,8 +2,10 @@
 
 #include "ComfyInputsLibrary.h"
 #include "ComfyRuntimeLibrary.h"
+#include "ComfySubsystem.h"
 #include "ComfyWorkflow.h"
 #include "Engine/Texture.h"
+#include "Misc/Paths.h"
 
 TFunction<FString(UObject* Asset, FString& OutError)> UComfyInputsLibrary::EditorAssetExporter;
 
@@ -51,6 +53,87 @@ FComfyInputs UComfyInputsLibrary::SetComfyAsset(const FComfyInputs& Inputs, cons
 	Result.Values.Remove(Name);
 	Result.Assets.Add(Name, Asset);
 	return Result;
+}
+
+bool UComfyInputsLibrary::GetComfyInput(const FComfyInputs& Inputs, const FString& Name, FString& Value)
+{
+	if (const FString* Text = Inputs.Values.Find(Name))
+	{
+		Value = *Text;
+		return true;
+	}
+	const TObjectPtr<UObject>* Asset = Inputs.Assets.Find(Name);
+	if (Asset && *Asset)
+	{
+		Value = (*Asset)->GetPathName();
+		return true;
+	}
+	Value.Reset();
+	return false;
+}
+
+FComfyInputs UComfyInputsLibrary::ClearComfyInput(const FComfyInputs& Inputs, const FString& Name)
+{
+	FComfyInputs Result = Inputs;
+	Result.Values.Remove(Name);
+	Result.Assets.Remove(Name);
+	return Result;
+}
+
+TArray<FString> UComfyInputsLibrary::GetComfyInputChoices(const UComfyWorkflow* Workflow, const FString& Name)
+{
+	const FComfyWorkflowInput* Input = Workflow ? Workflow->Inputs.FindByPredicate([&Name](const FComfyWorkflowInput& Each) { return Each.Name.Equals(Name, ESearchCase::IgnoreCase); }) : nullptr;
+	if (!Input)
+	{
+		return {};
+	}
+	if (Input->Type == EComfyInputType::Enum)
+	{
+		return Input->Options;
+	}
+	if (Input->Type != EComfyInputType::Model)
+	{
+		return {};
+	}
+
+	// A local ComfyUI lists what's installed. Cloud and Router (or a local ComfyUI nobody has checked yet) get the
+	// workflow's preferred files, which Cloud has.
+	TArray<FString> Choices;
+	if (UComfySubsystem* Comfy = UComfySubsystem::Get())
+	{
+		const FName Backend = Comfy->GetActiveBackend();
+		FComfyBackendProfile Profile;
+		if (Comfy->GetBackendProfile(Backend, Profile) && Profile.Kind == EComfyBackendKind::Local)
+		{
+			Choices = Comfy->GetInputOptions(Backend, Workflow, Input->Name);
+		}
+	}
+	if (Choices.Num() == 0)
+	{
+		if (!Input->DefaultValue.IsEmpty())
+		{
+			Choices.Add(Input->DefaultValue);
+		}
+		for (const FString& Preferred : Input->Prefer)
+		{
+			// Prefer entries can be name fragments; only whole file names make sense as a choice.
+			if (FPaths::GetExtension(Preferred).Len() > 0)
+			{
+				Choices.AddUnique(Preferred);
+			}
+		}
+	}
+	Choices.Remove(FString());
+	Choices.Insert(FString(), 0);
+	return Choices;
+}
+
+bool UComfyInputsLibrary::InputTakesImage(const UComfyWorkflow* Workflow, const FComfyWorkflowInput& Input)
+{
+	return Input.Type == EComfyInputType::File
+		&& (Input.Source.Equals(TEXT("SelectedTextures"), ESearchCase::IgnoreCase)
+			|| Input.Source.Equals(TEXT("ViewportCapture"), ESearchCase::IgnoreCase)
+			|| (Workflow && Workflow->GetNodeClass(Input.NodeId).Contains(TEXT("LoadImage"))));
 }
 
 FComfyInputs UComfyInputsLibrary::MakeComfyInputsFromMap(const TMap<FString, FString>& Values)
@@ -151,7 +234,11 @@ bool UComfyInputsLibrary::ResolveComfyInputs(const UComfyWorkflow* Workflow, con
 	OutValues.Reset();
 	if (!Workflow)
 	{
-		OutError = TEXT("No workflow given.");
+		Workflow = Inputs.Workflow;
+	}
+	if (!Workflow)
+	{
+		OutError = TEXT("No workflow given. Set the Workflow pin, or the Workflow of the Comfy Inputs.");
 		return false;
 	}
 
@@ -218,6 +305,15 @@ bool UComfyInputsLibrary::ResolveComfyInputs(const UComfyWorkflow* Workflow, con
 			return false;
 		}
 		OutValues.Add(Input->Name, Path);
+	}
+
+	// A game wants a new image each run, so a seed nobody set gets a new one rather than the graph's fixed value.
+	for (const FComfyWorkflowInput& Input : Workflow->Inputs)
+	{
+		if (Input.Type == EComfyInputType::Seed && !OutValues.Contains(Input.Name))
+		{
+			OutValues.Add(Input.Name, LexToString(UComfyRuntimeLibrary::NewSeed()));
+		}
 	}
 
 	if (Unknown.Num() > 0)

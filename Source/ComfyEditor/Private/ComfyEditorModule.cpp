@@ -5,10 +5,12 @@
 #include "ComfyEditorLibrary.h"
 #include "ComfyEditorStyle.h"
 #include "ComfyGraphPins.h"
+#include "ComfyInputsCustomization.h"
 #include "ComfyInputsLibrary.h"
 #include "EdGraphUtilities.h"
 #include "SComfyStudio.h"
 #include "Framework/Docking/TabManager.h"
+#include "PropertyEditorModule.h"
 #include "Styling/AppStyle.h"
 #include "ToolMenus.h"
 #include "Widgets/Docking/SDockTab.h"
@@ -40,6 +42,11 @@ void FComfyEditorModule::StartupModule()
 	PinFactory = MakeShared<FComfyGraphPinFactory>();
 	FEdGraphUtilities::RegisterVisualPinFactory(PinFactory);
 
+	// Comfy Inputs variables show their workflow's inputs as a form.
+	FPropertyEditorModule& PropertyModule = FModuleManager::LoadModuleChecked<FPropertyEditorModule>("PropertyEditor");
+	PropertyModule.RegisterCustomPropertyTypeLayout(FComfyInputs::StaticStruct()->GetFName(), FOnGetPropertyTypeCustomizationInstance::CreateStatic(&FComfyInputsCustomization::MakeInstance));
+	PropertyModule.NotifyCustomizationModuleChanged();
+
 	// Comfy Inputs can carry meshes, sounds and textures with source art; only the editor can write those to files.
 	UComfyInputsLibrary::EditorAssetExporter = [](UObject* Asset, FString& OutError)
 	{
@@ -52,6 +59,10 @@ void FComfyEditorModule::StartupModule()
 void FComfyEditorModule::ShutdownModule()
 {
 	UComfyInputsLibrary::EditorAssetExporter = nullptr;
+	if (FPropertyEditorModule* PropertyModule = FModuleManager::GetModulePtr<FPropertyEditorModule>("PropertyEditor"))
+	{
+		PropertyModule->UnregisterCustomPropertyTypeLayout(FComfyInputs::StaticStruct()->GetFName());
+	}
 	if (PinFactory.IsValid())
 	{
 		FEdGraphUtilities::UnregisterVisualPinFactory(PinFactory);

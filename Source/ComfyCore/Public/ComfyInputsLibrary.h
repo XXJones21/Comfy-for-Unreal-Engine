@@ -53,6 +53,25 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Comfy|Inputs", meta = (DisplayName = "Set Asset (Comfy Inputs)", AutoCreateRefTerm = "Inputs", Keywords = "mesh sound"))
 	static FComfyInputs SetComfyAsset(const FComfyInputs& Inputs, const FString& Name, UObject* Asset);
 
+	/** The value set for an input: text, or the asset's path for a File input. False when it isn't set, so the workflow's value applies. */
+	UFUNCTION(BlueprintPure, Category = "Comfy|Inputs", meta = (DisplayName = "Get Comfy Input"))
+	static bool GetComfyInput(const FComfyInputs& Inputs, const FString& Name, FString& Value);
+
+	/** Remove an input's value, so the workflow's own value applies (a seed gets a new one each run). */
+	UFUNCTION(BlueprintPure, Category = "Comfy|Inputs", meta = (DisplayName = "Clear Comfy Input", AutoCreateRefTerm = "Inputs"))
+	static FComfyInputs ClearComfyInput(const FComfyInputs& Inputs, const FString& Name);
+
+	/**
+	 * The choices for a Choice or Model input. For a model, a local ComfyUI that Studio has checked lists its installed
+	 * files; other backends list the workflow's preferred files. Model choices start with an empty entry, which lets the
+	 * backend pick. Empty for other inputs.
+	 */
+	UFUNCTION(BlueprintPure, Category = "Comfy|Inputs")
+	static TArray<FString> GetComfyInputChoices(const UComfyWorkflow* Workflow, const FString& Name);
+
+	/** True for a File input that takes an image, so it can take a texture. */
+	static bool InputTakesImage(const UComfyWorkflow* Workflow, const FComfyWorkflowInput& Input);
+
 	/** Comfy Inputs from a name-to-text map, the form Run Comfy Workflow (String Map) takes. */
 	UFUNCTION(BlueprintPure, Category = "Comfy|Inputs", meta = (DisplayName = "To Comfy Inputs (Map)", CompactNodeTitle = "->", BlueprintAutocast))
 	static FComfyInputs MakeComfyInputsFromMap(const TMap<FString, FString>& Values);
@@ -64,6 +83,7 @@ public:
 	/**
 	 * Check inputs against a workflow without running it: every name must be one of its inputs and every
 	 * value must fit the input's type (a whole number for Int, one of the choices for a list). Assets aren't exported.
+	 * With no Workflow, checks against the workflow the inputs name.
 	 */
 	UFUNCTION(BlueprintCallable, Category = "Comfy|Inputs")
 	static bool ValidateComfyInputs(const UComfyWorkflow* Workflow, const FComfyInputs& Inputs, FString& OutError);

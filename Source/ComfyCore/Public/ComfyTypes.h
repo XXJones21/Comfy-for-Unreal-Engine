@@ -6,6 +6,7 @@
 #include "ComfyTypes.generated.h"
 
 class FJsonObject;
+class UComfyWorkflow;
 
 /** Which kind of service a backend profile points at. */
 UENUM(BlueprintType)
@@ -224,14 +225,19 @@ struct COMFYCORE_API FComfyWorkflowPreset
 };
 
 /**
- * Values for a workflow's inputs, keyed by the names in its manifest. Build it with the Set nodes in
- * Comfy|Inputs and pass it to Run Comfy Workflow. Names are checked against the workflow when the run starts,
- * so a misspelled name fails the run instead of being ignored.
+ * Values for a workflow's inputs, keyed by the names in its manifest. Pick a workflow and the Details panel lists
+ * its inputs, as the Run view does; or build it with the Set nodes in Comfy|Inputs. Pass it to Run Comfy Workflow.
+ * Names are checked against the workflow when the run starts, so a misspelled name fails the run instead of being
+ * ignored. Inputs left out keep the workflow's values, except seeds, which get a new seed on every run.
  */
 USTRUCT(BlueprintType, meta = (DisplayName = "Comfy Inputs"))
 struct COMFYCORE_API FComfyInputs
 {
 	GENERATED_BODY()
+
+	/** The workflow these inputs are for. Run Comfy Workflow runs it when its own Workflow pin is empty. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Comfy")
+	TObjectPtr<UComfyWorkflow> Workflow;
 
 	/** Input name to value, as text. A Seed of -1 gets a new seed on every run. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Comfy")

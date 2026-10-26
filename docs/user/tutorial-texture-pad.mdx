@@ -189,6 +189,42 @@ Click **Compile** and **Save**.
   </Step>
 </Steps>
 
+## Keep the inputs in a variable
+
+Instead of setting pins on the node, you can keep the inputs in a **Comfy Inputs** variable. The variable knows its workflow, so its Default Value shows that workflow's inputs as a form, like the **Run** view. You can also edit the form on each placed actor.
+
+<Steps>
+  <Step title="Add the variable">
+    In **My Blueprint**, add a variable named `PadInputs` of type **Comfy Inputs**. Click **Compile**.
+  </Step>
+  <Step title="Pick the workflow">
+    In the **Details** panel, under **Default Value**, expand `PadInputs` and set **Workflow** to `texture_seamless`.
+
+    **You should see:** one row per input: **Surface**, **Seed** ("New seed every run"), **Width**, **Height**, **Diffusion model**, **Text encoder** and **VAE** (all three **Auto**), and a collapsed **Values as text** group. The header says **Seamless Texture · 0 set**.
+  </Step>
+  <Step title="Fill in the form">
+    Set **Surface** to `mossy cobblestone path`, and **Width** and **Height** to `512`.
+
+    **You should see:** a reset arrow next to each row you set, and the header says **3 set**. Click a reset arrow: that row goes back to the workflow's value. Press **Ctrl+Z**: the value comes back.
+  </Step>
+  <Step title="Make it editable per actor">
+    Click the eye icon next to `PadInputs` in **My Blueprint** to make it **Instance Editable**. Compile.
+  </Step>
+  <Step title="Use the variable on the node">
+    Replace **Run Seamless Texture** with **Run Comfy Workflow**, from the **Comfy** category. Leave its **Workflow** pin empty. Connect `PadInputs` to its **Inputs** pin. Connect the same **On Completed**, **On Failed** and **On Progress** wires as before.
+
+    To keep a random surface, put **Set Text (Comfy Inputs)** between them: `PadInputs` into **Inputs**, **Name** `prompt`, and **Random Array Item** of `Prompts` into **Value**.
+  </Step>
+  <Step title="Compile and play">
+    **You should see:** no errors, even though **Workflow** is empty. In the game, the pad works as before.
+  </Step>
+  <Step title="Edit one placed actor">
+    Place a second `BP_ComfyPad`. Select it in the level. In the **Details** panel, find **Pad Inputs** and change **Surface**.
+
+    **You should see:** the same form as in the Blueprint. Only that actor uses the new surface. If you kept **Set Text** for the random surface, remove it to see the difference.
+  </Step>
+</Steps>
+
 ## More things to test
 
 These checks use the same Blueprint. Make each change on a copy of the node so that the pad still works.
@@ -199,6 +235,9 @@ These checks use the same Blueprint. Make each change on a copy of the node so t
 | Wired Workflow | Connect a **Comfy Workflow** variable to the **Workflow** pin. | The input pins go away and only **Inputs** stays. |
 | Model choices | Open the **Diffusion model** dropdown with Comfy Desktop as the active backend, and then with Comfy Cloud. | Desktop lists the files that are installed. Cloud lists the Workflow's preferred files. Both start with **Auto**. |
 | Name check | Connect the variable from the previous test to `texture_seamless`. Add **Set Text (Comfy Inputs)** with **Name** set to `promt`, and connect it to **Inputs**. Play and step on the pad. | **On Failed** prints `Seamless Texture has no input named "promt"`, followed by the list of its inputs. |
+| Unknown name in a variable | In `PadInputs`, open **Values as text** and add the key `promt` with any value. | A red `promt` row: "Seamless Texture has no input with this name, so a run fails", with a **Remove** button. |
+| Workflow change in a variable | Set the variable's **Workflow** to `texture_restyle`. | The rows change to that workflow's inputs, with a texture picker for **Texture**. Values that don't fit the new workflow show as unknown names. |
+| No workflow at all | Clear the variable's **Workflow** and keep it connected to a node with an empty **Workflow** pin. Play. | **On Failed** prints "No workflow given. Set the Workflow pin, or the Workflow of the Comfy Inputs." |
 | Old node | Place **Run Comfy Workflow (String Map)**. | It looks and works as before. |
 
 ## Troubleshooting

@@ -32,14 +32,6 @@ namespace ComfyRunNodePrivate
 		return FName(*(InputPinPrefix + Input.Name));
 	}
 
-	/** File inputs that take an image get a texture pin; the rest take a path. */
-	static bool TakesImage(const UComfyWorkflow* Workflow, const FComfyWorkflowInput& Input)
-	{
-		return Input.Source.Equals(TEXT("SelectedTextures"), ESearchCase::IgnoreCase)
-			|| Input.Source.Equals(TEXT("ViewportCapture"), ESearchCase::IgnoreCase)
-			|| Workflow->GetNodeClass(Input.NodeId).Contains(TEXT("LoadImage"));
-	}
-
 	struct FPinSpec
 	{
 		FName Category;
@@ -73,7 +65,8 @@ namespace ComfyRunNodePrivate
 			Spec.DefaultValue = Input.DefaultValue.ToBool() ? TEXT("true") : TEXT("false");
 			break;
 		case EComfyInputType::File:
-			if (TakesImage(Workflow, Input))
+			// File inputs that take an image get a texture pin; the rest take a path.
+			if (UComfyInputsLibrary::InputTakesImage(Workflow, Input))
 			{
 				Spec.Category = UEdGraphSchema_K2::PC_Object;
 				Spec.SubCategoryObject = UTexture::StaticClass();
@@ -296,44 +289,7 @@ TArray<FString> UK2Node_RunComfyWorkflow::GetPinChoices(const UEdGraphPin* Pin) 
 	{
 		return {};
 	}
-	if (Input->Type == EComfyInputType::Enum)
-	{
-		return Input->Options;
-	}
-	if (Input->Type != EComfyInputType::Model)
-	{
-		return {};
-	}
-
-	// A local ComfyUI lists what's installed. Cloud and Router (or a local ComfyUI nobody has checked yet) get the
-	// workflow's preferred files, which Cloud has.
-	TArray<FString> Choices;
-	if (UComfySubsystem* Comfy = UComfySubsystem::Get())
-	{
-		const FName Backend = Comfy->GetActiveBackend();
-		FComfyBackendProfile Profile;
-		if (Comfy->GetBackendProfile(Backend, Profile) && Profile.Kind == EComfyBackendKind::Local)
-		{
-			Choices = Comfy->GetInputOptions(Backend, PinsWorkflow, Input->Name);
-		}
-	}
-	if (Choices.Num() == 0)
-	{
-		if (!Input->DefaultValue.IsEmpty())
-		{
-			Choices.Add(Input->DefaultValue);
-		}
-		for (const FString& Preferred : Input->Prefer)
-		{
-			// Prefer entries can be name fragments; only whole file names make sense as a choice.
-			if (FPaths::GetExtension(Preferred).Len() > 0)
-			{
-				Choices.AddUnique(Preferred);
-			}
-		}
-	}
-	Choices.Insert(FString(), 0);
-	return Choices;
+	return UComfyInputsLibrary::GetComfyInputChoices(PinsWorkflow, Input->Name);
 }
 
 FText UK2Node_RunComfyWorkflow::GetNodeTitle(ENodeTitleType::Type TitleType) const
@@ -352,7 +308,7 @@ FText UK2Node_RunComfyWorkflow::GetNodeTitle(ENodeTitleType::Type TitleType) con
 
 FText UK2Node_RunComfyWorkflow::GetTooltipText() const
 {
-	const FText Base = LOCTEXT("Tooltip", "Run a ComfyUI workflow on the active backend, or the one named on Backend. Set Workflow to an asset to get a pin for each of its inputs; pins left at their defaults keep the workflow's values.\n\nOn Progress fires while it runs, then On Completed (outputs downloaded) or On Failed (see the job's error) fires once.");
+	const FText Base = LOCTEXT("Tooltip", "Run a ComfyUI workflow on the active backend, or the one named on Backend. Set Workflow to an asset to get a pin for each of its inputs; pins left at their defaults keep the workflow's values. Or leave Workflow empty and connect Comfy Inputs: it runs their workflow.\n\nOn Progress fires while it runs, then On Completed (outputs downloaded) or On Failed (see the job's error) fires once.");
 	if (PinsWorkflow && !PinsWorkflow->Description.IsEmpty())
 	{
 		return FText::Format(LOCTEXT("TooltipWithDescription", "{0}\n\n{1}"), PinsWorkflow->Description, Base);
@@ -453,10 +409,12 @@ void UK2Node_RunComfyWorkflow::ValidateNodeDuringCompilation(FCompilerResultsLog
 {
 	Super::ValidateNodeDuringCompilation(MessageLog);
 
+	// With the Workflow pin empty, connected Comfy Inputs can name the workflow; that's checked when the run starts.
 	const UEdGraphPin* WorkflowPin = FindPin(WorkflowPinName);
-	if (WorkflowPin && WorkflowPin->LinkedTo.Num() == 0 && !WorkflowPin->DefaultObject)
+	const UEdGraphPin* InputsPin = FindPin(InputsPinName);
+	if (WorkflowPin && WorkflowPin->LinkedTo.Num() == 0 && !WorkflowPin->DefaultObject && !(InputsPin && InputsPin->LinkedTo.Num() > 0))
 	{
-		MessageLog.Error(*LOCTEXT("NoWorkflow", "@@ has no workflow. Pick one on its Workflow pin.").ToString(), this);
+		MessageLog.Error(*LOCTEXT("NoWorkflow", "@@ has no workflow. Pick one on its Workflow pin, or connect Comfy Inputs that have one.").ToString(), this);
 		return;
 	}
 	if (PinsWorkflow && MakeSignature(PinsWorkflow) != PinsSignature)
