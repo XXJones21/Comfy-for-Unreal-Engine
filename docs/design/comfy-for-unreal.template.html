@@ -190,7 +190,7 @@ svg.diagram{width:100%;height:auto;display:block}
     <div class="brand"><img src="{{img:comfy-icon.png}}" alt=""><span class="kicker">Living design document</span></div>
     <h1>Comfy for Unreal</h1>
     <p class="tagline">ComfyUI inside the Unreal Editor. Workflows in, game-ready assets out.</p>
-    <p class="meta">Version 0.3.3 · 2026-10-25 · Comfy Org DevRel · Status: preparing an internal alpha, built for UE 5.8</p>
+    <p class="meta">Version 0.3.4 · 2026-10-25 · Comfy Org DevRel · Status: preparing an internal alpha, built for UE 5.8</p>
     <p class="truth">This is the source of truth for the product's experience and design. It extends the earlier proposal page and <code>docs/SPEC.md</code>, and the <a href="#changelog" style="color:#31b9f4">changelog</a> records each revision.</p>
   </div>
 </header>
@@ -788,10 +788,10 @@ svg.diagram{width:100%;height:auto;display:block}
   <div class="tbl"><table>
     <thead><tr><th>Gap</th><th>Effect</th><th>State</th></tr></thead>
     <tbody>
-      <tr><td class="k">Inputs weren't typed pins</td><td>A misspelled key was ignored without a warning, every value was a string, and the node looked the same whichever workflow it ran.</td><td><span class="chip partial">built, not run</span> The typed node, the Comfy Inputs variable with its Details form and name and type checks, and the starters as assets (above). Compiles clean; not yet tried in the editor. The String Map node keeps the old behaviour.</td></tr>
+      <tr><td class="k">Inputs weren't typed pins</td><td>A misspelled key was ignored without a warning, every value was a string, and the node looked the same whichever workflow it ran.</td><td><span class="chip built">tested</span> The typed node, the Comfy Inputs variable with its Details form and name and type checks, and the starters as assets (above). Tested October 25 through the Comfy Inputs path on Comfy Cloud (see below). The pins-per-input path and Desktop are still to try. The String Map node keeps the old behaviour.</td></tr>
       <tr><td class="k">In-game sound needs 16-bit PCM WAV</td><td>The Sound Effect and Music Track starters save with ComfyUI's <i>SaveAudio</i>, which writes FLAC, so <i>Load Sound From Job</i> likely fails on their results in game. Importing in the editor works.</td><td><span class="chip todo">to check</span> Options: a WAV save node in the starters, or FLAC decoding in the runtime loader.</td></tr>
       <tr><td class="k">Typed outputs</td><td>On Completed passes the job; you still load each result with <i>Load Texture From Job</i> and friends.</td><td><span class="chip todo">later</span> Pins per tagged output (Albedo, Normal, Sound), loaded for you.</td></tr>
-      <tr><td class="k">Not run end to end</td><td>No Blueprint node has been exercised in this round of work.</td><td><span class="chip todo">to test</span></td></tr>
+      <tr><td class="k">Run end to end</td><td>October 25, in the sandbox: a placed actor with a trigger box and a Comfy Inputs variable set to Seamless Texture with a custom prompt. Stepping on it as the Third Person template character ran <i>Run Comfy Workflow</i> on Comfy Cloud, and <i>Load Texture From Job</i> put the result on a cube. The test found two bugs, both fixed: the compile check rejected a wired Workflow or Inputs pin, and values set in the form didn't reach actors already in the level.</td><td><span class="chip built">tested</span> Cloud. <span class="chip todo">to test</span> Desktop, the pins-per-input node, image inputs.</td></tr>
     </tbody>
   </table></div>
 </section>
@@ -988,6 +988,7 @@ svg.diagram{width:100%;height:auto;display:block}
   <div class="tbl"><table>
     <thead><tr><th>Version</th><th>Date</th><th>Changes</th></tr></thead>
     <tbody>
+      <tr><td>0.3.4</td><td>2026-10-25</td><td>Blueprint tested end to end on Comfy Cloud; fixes for the compile check with wired pins and for form values reaching placed actors.</td></tr>
       <tr><td>0.3.3</td><td>2026-10-25</td><td>Blueprint: Comfy Inputs as a workflow-aware variable with a Details form; the node runs the inputs' workflow when its pin is empty; Backend is a choice of Active backend, Desktop, Comfy Cloud or Comfy Router.</td></tr>
       <tr><td>0.3.2</td><td>2026-10-25</td><td>Blueprint: the typed Run Comfy Workflow node, Comfy Inputs, and the starters as assets.</td></tr>
       <tr><td>0.3.1</td><td>2026-10-25</td><td>Why the extension never loaded, and how it gets installed on Desktop, for testers and on Cloud. Blueprint walkthrough and gaps; corrected the claim that the manifest drives the Blueprint node.</td></tr>

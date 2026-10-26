@@ -246,7 +246,9 @@ These checks use the same Blueprint. Make each change on a copy of the node so t
 | Problem | Try this |
 | --- | --- |
 | **Run Seamless Texture** isn't in the menu | Make sure the Workflow assets are in **Plugins > Comfy for Unreal Content > Workflows**. If they aren't there, check the Output Log for Comfy messages from editor startup. You can also place **Run Comfy Workflow** and set its **Workflow** pin. |
+| You play as a flying camera, not a character | Your project has no character set as the default pawn. In the Content Browser, click **Add > Add Feature or Content Pack**, add **Third Person** from the **Blueprint** tab, and set **Project Settings > Maps & Modes > Default GameMode** to `BP_ThirdPersonGameMode`. |
 | Nothing happens on the pad | Make sure you're playing as a Character. Make sure **Generate Overlap Events** is on for `Trigger`. Add a **Print String** right after the overlap event to see if it fires. |
 | The run fails at once | Read the printed error. Usually the backend isn't connected or a model file is missing. Run **Seamless Texture** once from the Comfy Studio **Run** view to check the backend. |
 | The run finishes but the cube doesn't change | Make sure **Parameter Name** is exactly `BaseColor`, the same as in `M_ComfyCube`. Make sure `CubeMaterial` is set at **Begin Play**. |
+| The run ignores what you set in `PadInputs` | A placed actor keeps its own copy of an **Instance Editable** variable once you change it on that actor. Select the actor in the level and click the reset arrow next to **Pad Inputs**, or set the values on the actor itself. Check what was sent in Comfy Studio's run history. |
 | The cube stays at the old texture after one run | `IsGenerating` is still set. Make sure both **On Completed** and **On Failed** clear it. |
