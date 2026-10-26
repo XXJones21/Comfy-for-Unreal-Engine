@@ -33,7 +33,6 @@ public:
 	virtual void PinDefaultValueChanged(UEdGraphPin* Pin) override;
 	virtual void PinConnectionListChanged(UEdGraphPin* Pin) override;
 	virtual void GetPinHoverText(const UEdGraphPin& Pin, FString& HoverTextOut) const override;
-	virtual void ValidateNodeDuringCompilation(FCompilerResultsLog& MessageLog) const override;
 
 	// UK2Node
 	virtual void ExpandNode(FKismetCompilerContext& CompilerContext, UEdGraph* SourceGraph) override;
@@ -62,6 +61,12 @@ private:
 
 	/** Replace the input pins after the Workflow pin changed. */
 	void RebuildInputPins();
+
+	/**
+	 * Compile checks: a workflow to run, inputs that still match it, valid choices. Run from ExpandNode, because the
+	 * compiler validates nodes only after expansion, when the base class has already broken the node's links.
+	 */
+	bool CheckBeforeExpansion(FCompilerResultsLog& MessageLog) const;
 
 	/** True while the node is the compiler's copy, being expanded. */
 	bool IsInCompilerGraph() const;

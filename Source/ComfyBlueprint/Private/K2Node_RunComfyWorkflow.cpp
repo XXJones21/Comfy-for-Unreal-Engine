@@ -405,17 +405,15 @@ void UK2Node_RunComfyWorkflow::GetPinHoverText(const UEdGraphPin& Pin, FString& 
 	GetDefault<UEdGraphSchema_K2>()->ConstructBasicPinTooltip(Pin, FText::FromString(FString::Join(Lines, TEXT("\n"))), HoverTextOut);
 }
 
-void UK2Node_RunComfyWorkflow::ValidateNodeDuringCompilation(FCompilerResultsLog& MessageLog) const
+bool UK2Node_RunComfyWorkflow::CheckBeforeExpansion(FCompilerResultsLog& MessageLog) const
 {
-	Super::ValidateNodeDuringCompilation(MessageLog);
-
 	// With the Workflow pin empty, connected Comfy Inputs can name the workflow; that's checked when the run starts.
 	const UEdGraphPin* WorkflowPin = FindPin(WorkflowPinName);
 	const UEdGraphPin* InputsPin = FindPin(InputsPinName);
 	if (WorkflowPin && WorkflowPin->LinkedTo.Num() == 0 && !WorkflowPin->DefaultObject && !(InputsPin && InputsPin->LinkedTo.Num() > 0))
 	{
 		MessageLog.Error(*LOCTEXT("NoWorkflow", "@@ has no workflow. Pick one on its Workflow pin, or connect Comfy Inputs that have one.").ToString(), this);
-		return;
+		return false;
 	}
 	if (PinsWorkflow && MakeSignature(PinsWorkflow) != PinsSignature)
 	{
@@ -432,11 +430,18 @@ void UK2Node_RunComfyWorkflow::ValidateNodeDuringCompilation(FCompilerResultsLog
 				FText::FromString(Pin->DefaultValue), Pin->GetDisplayName(), FText::FromString(FString::Join(Input->Options, TEXT(", ")))).ToString(), this);
 		}
 	}
+	return true;
 }
 
 void UK2Node_RunComfyWorkflow::ExpandNode(FKismetCompilerContext& CompilerContext, UEdGraph* SourceGraph)
 {
 	using namespace ComfyRunNodePrivate;
+
+	if (!CheckBeforeExpansion(CompilerContext.MessageLog))
+	{
+		BreakAllNodeLinks();
+		return;
+	}
 
 	const UEdGraphSchema_K2* Schema = CompilerContext.GetSchema();
 	UEdGraphPin* InputsPin = FindPinChecked(InputsPinName);
