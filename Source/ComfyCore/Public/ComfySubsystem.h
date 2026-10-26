@@ -44,7 +44,7 @@ public:
 	 * Backend picks a profile by name; None uses the active backend.
 	 */
 	UFUNCTION(BlueprintCallable, Category = "Comfy", meta = (AutoCreateRefTerm = "Inputs"))
-	UComfyJob* RunWorkflow(UComfyWorkflow* Workflow, const TMap<FString, FString>& Inputs, FName Backend = NAME_None);
+	UComfyJob* RunWorkflow(UComfyWorkflow* Workflow, const TMap<FString, FString>& Inputs, UPARAM(meta = (ComfyBackend = "true")) FName Backend = NAME_None);
 
 	/**
 	 * Run a workflow asset with typed inputs (see Comfy|Inputs). Unlike RunWorkflow, every name must be one of the
@@ -53,40 +53,40 @@ public:
 	 * one the inputs name.
 	 */
 	UFUNCTION(BlueprintCallable, Category = "Comfy")
-	UComfyJob* RunWorkflowWithInputs(UComfyWorkflow* Workflow, const FComfyInputs& Inputs, FName Backend = NAME_None);
+	UComfyJob* RunWorkflowWithInputs(UComfyWorkflow* Workflow, const FComfyInputs& Inputs, UPARAM(meta = (ComfyBackend = "true")) FName Backend = NAME_None);
 
 	/** Run an API-format graph given as JSON, without an asset. */
 	UFUNCTION(BlueprintCallable, Category = "Comfy", meta = (AutoCreateRefTerm = "Inputs"))
-	UComfyJob* RunWorkflowJson(const FString& ApiGraphJson, const TMap<FString, FString>& Inputs, FName Backend = NAME_None);
+	UComfyJob* RunWorkflowJson(const FString& ApiGraphJson, const TMap<FString, FString>& Inputs, UPARAM(meta = (ComfyBackend = "true")) FName Backend = NAME_None);
 
 	/**
 	 * Call one Comfy Router model (for example "bfl/flux-2-pro") with its native request body.
 	 * Media URLs in the result are downloaded as the job's outputs. Spends Comfy credits.
 	 */
 	UFUNCTION(BlueprintCallable, Category = "Comfy|Router")
-	UComfyJob* RunRouterModel(const FString& ModelId, const FString& RequestJson, FName Backend = NAME_None);
+	UComfyJob* RunRouterModel(const FString& ModelId, const FString& RequestJson, UPARAM(meta = (ComfyBackend = "true")) FName Backend = NAME_None);
 
 	/** Fetch a Router model's OpenAPI document (its input and output schema). */
 	UFUNCTION(BlueprintCallable, Category = "Comfy|Router")
-	void GetRouterModelSchema(const FString& ModelId, FComfyTextResultDelegate OnResult, FName Backend = NAME_None);
+	void GetRouterModelSchema(const FString& ModelId, FComfyTextResultDelegate OnResult, UPARAM(meta = (ComfyBackend = "true")) FName Backend = NAME_None);
 
 	/** List Router models, one page at a time. Pass the previous page's next_cursor, or empty. */
 	UFUNCTION(BlueprintCallable, Category = "Comfy|Router")
-	void ListRouterModels(const FString& Cursor, FComfyTextResultDelegate OnResult, FName Backend = NAME_None);
+	void ListRouterModels(const FString& Cursor, FComfyTextResultDelegate OnResult, UPARAM(meta = (ComfyBackend = "true")) FName Backend = NAME_None);
 
 	/** Check that a backend answers and accepts our key. Native backends also report their node types. */
 	UFUNCTION(BlueprintCallable, Category = "Comfy|Backends")
-	void ProbeBackend(FName Backend, FComfyBackendStatusDelegate OnStatus);
+	void ProbeBackend(UPARAM(meta = (ComfyBackend = "true")) FName Backend, FComfyBackendStatusDelegate OnStatus);
 
 	/** The last probe result for a backend. */
 	UFUNCTION(BlueprintPure, Category = "Comfy|Backends")
-	FComfyBackendStatus GetLastStatus(FName Backend) const;
+	FComfyBackendStatus GetLastStatus(UPARAM(meta = (ComfyBackend = "true")) FName Backend) const;
 
 	UFUNCTION(BlueprintPure, Category = "Comfy|Backends")
 	TArray<FName> GetBackendNames() const;
 
 	UFUNCTION(BlueprintPure, Category = "Comfy|Backends")
-	bool GetBackendProfile(FName Backend, FComfyBackendProfile& OutProfile) const;
+	bool GetBackendProfile(UPARAM(meta = (ComfyBackend = "true")) FName Backend, FComfyBackendProfile& OutProfile) const;
 
 	/** The backend used when a run doesn't name one. */
 	UFUNCTION(BlueprintPure, Category = "Comfy|Backends")
@@ -94,7 +94,7 @@ public:
 
 	/** Switch the active backend. In the editor, bRemember saves it to your user settings. */
 	UFUNCTION(BlueprintCallable, Category = "Comfy|Backends")
-	void SetActiveBackend(FName Backend, bool bRemember = true);
+	void SetActiveBackend(UPARAM(meta = (ComfyBackend = "true")) FName Backend, bool bRemember = true);
 
 	/**
 	 * Use this API key for the rest of the session, without saving it. For shipped games,
@@ -105,29 +105,29 @@ public:
 
 	/** True when running this workflow on this backend can spend Comfy credits. */
 	UFUNCTION(BlueprintPure, Category = "Comfy|Backends")
-	bool SpendsCredits(FName Backend, const UComfyWorkflow* Workflow) const;
+	bool SpendsCredits(UPARAM(meta = (ComfyBackend = "true")) FName Backend, const UComfyWorkflow* Workflow) const;
 
 	/** Choices the backend reports for a workflow input (model files, enums). Empty when unknown: probe the backend first. */
 	UFUNCTION(BlueprintPure, Category = "Comfy|Backends")
-	TArray<FString> GetInputOptions(FName Backend, const UComfyWorkflow* Workflow, const FString& InputName) const;
+	TArray<FString> GetInputOptions(UPARAM(meta = (ComfyBackend = "true")) FName Backend, const UComfyWorkflow* Workflow, const FString& InputName) const;
 
 	/**
 	 * The value a Model input gets when nobody sets it: the first backend file matching its Prefer list.
 	 * Empty when the input has a Prefer list and the backend has none of those files. Without a Prefer list, its default.
 	 */
 	UFUNCTION(BlueprintPure, Category = "Comfy|Backends")
-	FString GetDefaultInputValue(FName Backend, const UComfyWorkflow* Workflow, const FString& InputName) const;
+	FString GetDefaultInputValue(UPARAM(meta = (ComfyBackend = "true")) FName Backend, const UComfyWorkflow* Workflow, const FString& InputName) const;
 
 	/** Model inputs whose file the backend doesn't have, for the values a run would use. Empty when all are there, or when the backend can't say. */
 	UFUNCTION(BlueprintPure, Category = "Comfy|Backends")
-	TArray<FComfyWorkflowInput> GetMissingModels(FName Backend, const UComfyWorkflow* Workflow, const TMap<FString, FString>& Inputs) const;
+	TArray<FComfyWorkflowInput> GetMissingModels(UPARAM(meta = (ComfyBackend = "true")) FName Backend, const UComfyWorkflow* Workflow, const TMap<FString, FString>& Inputs) const;
 
 	/** One line per missing model: the file, its size and folder, and where to download it. */
 	static FString DescribeMissingModels(FName Backend, const TArray<FComfyWorkflowInput>& Missing);
 
 	/** Node classes the workflow needs that the backend doesn't have. Empty when all are there, or when the backend can't say. */
 	UFUNCTION(BlueprintPure, Category = "Comfy|Backends")
-	TArray<FString> GetMissingNodeClasses(FName Backend, const UComfyWorkflow* Workflow) const;
+	TArray<FString> GetMissingNodeClasses(UPARAM(meta = (ComfyBackend = "true")) FName Backend, const UComfyWorkflow* Workflow) const;
 
 	/**
 	 * The default workflows that ship with the plugin (Resources/Workflows), loaded as
@@ -141,7 +141,7 @@ public:
 	 * (GET /comfy_unreal/workflows). Backends without the extension, and Comfy Cloud, simply have none.
 	 */
 	UFUNCTION(BlueprintCallable, Category = "Comfy|Workflow")
-	void RefreshServerWorkflows(FName Backend = NAME_None);
+	void RefreshServerWorkflows(UPARAM(meta = (ComfyBackend = "true")) FName Backend = NAME_None);
 
 	/** The last fetched server workflows, as transient assets. */
 	UFUNCTION(BlueprintPure, Category = "Comfy|Workflow")
@@ -149,7 +149,7 @@ public:
 
 	/** Tell the extension an Unreal editor is connected (POST /comfy_unreal/heartbeat). Comfy Studio sends one while it's open. */
 	UFUNCTION(BlueprintCallable, Category = "Comfy|Workflow")
-	void SendHeartbeat(FName Backend = NAME_None);
+	void SendHeartbeat(UPARAM(meta = (ComfyBackend = "true")) FName Backend = NAME_None);
 
 	UFUNCTION(BlueprintPure, Category = "Comfy|Jobs")
 	TArray<UComfyJob*> GetJobs() const;

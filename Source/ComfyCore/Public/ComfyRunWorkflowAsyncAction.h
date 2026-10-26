@@ -34,10 +34,10 @@ public:
 	FComfyAsyncJobPin OnFailed;
 
 	UFUNCTION(BlueprintCallable, Category = "Comfy", meta = (BlueprintInternalUseOnly = "true", WorldContext = "WorldContextObject", AutoCreateRefTerm = "Inputs", DisplayName = "Run Comfy Workflow (String Map)"))
-	static UComfyRunWorkflowAsyncAction* RunComfyWorkflow(UObject* WorldContextObject, UComfyWorkflow* Workflow, const TMap<FString, FString>& Inputs, FName Backend = NAME_None);
+	static UComfyRunWorkflowAsyncAction* RunComfyWorkflow(UObject* WorldContextObject, UComfyWorkflow* Workflow, const TMap<FString, FString>& Inputs, UPARAM(meta = (ComfyBackend = "true")) FName Backend = NAME_None);
 
 	UFUNCTION(BlueprintCallable, Category = "Comfy|Router", meta = (BlueprintInternalUseOnly = "true", WorldContext = "WorldContextObject", DisplayName = "Run Comfy Router Model"))
-	static UComfyRunWorkflowAsyncAction* RunComfyRouterModel(UObject* WorldContextObject, const FString& ModelId, const FString& RequestJson, FName Backend = NAME_None);
+	static UComfyRunWorkflowAsyncAction* RunComfyRouterModel(UObject* WorldContextObject, const FString& ModelId, const FString& RequestJson, UPARAM(meta = (ComfyBackend = "true")) FName Backend = NAME_None);
 
 	virtual void Activate() override;
 
@@ -73,7 +73,7 @@ class COMFYCORE_API UComfyRunWorkflowWithInputsAction : public UComfyRunWorkflow
 
 public:
 	UFUNCTION(BlueprintCallable, Category = "Comfy", meta = (BlueprintInternalUseOnly = "true", WorldContext = "WorldContextObject", AutoCreateRefTerm = "Inputs", DisplayName = "Run Comfy Workflow"))
-	static UComfyRunWorkflowWithInputsAction* RunComfyWorkflowWithInputs(UObject* WorldContextObject, UComfyWorkflow* Workflow, const FComfyInputs& Inputs, FName Backend = NAME_None);
+	static UComfyRunWorkflowWithInputsAction* RunComfyWorkflowWithInputs(UObject* WorldContextObject, UComfyWorkflow* Workflow, const FComfyInputs& Inputs, UPARAM(meta = (ComfyBackend = "true")) FName Backend = NAME_None);
 
 protected:
 	virtual UComfyJob* StartJob(UComfySubsystem* Comfy) override;

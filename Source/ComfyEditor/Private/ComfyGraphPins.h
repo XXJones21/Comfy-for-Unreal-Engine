@@ -5,7 +5,10 @@
 #include "CoreMinimal.h"
 #include "EdGraphUtilities.h"
 
-/** Gives the Run Comfy Workflow node's Choice and Model input pins a dropdown of their choices. */
+/**
+ * Dropdowns for Comfy pins: the Run Comfy Workflow node's Choice and Model inputs, and every Backend parameter
+ * tagged ComfyBackend, which lists the backend profiles.
+ */
 class FComfyGraphPinFactory : public FGraphPanelPinFactory
 {
 public:
