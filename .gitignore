@@ -9,3 +9,5 @@ DerivedDataCache/
 *.suo
 *.VC.db
 __pycache__/
+.DS_Store
+*.mov
